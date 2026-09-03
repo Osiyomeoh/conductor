@@ -1,0 +1,180 @@
+"""The control loop.
+
+Trackers record work. Conductor runs a closed loop whose objective is the
+human's attention and whose lever is cheap parallel labour:
+
+    observe -> verify -> recover -> compress -> speculate -> dispatch
+
+Every tick is idempotent and every state change is appended to an event log,
+so the loop is resumable and the whole run is replayable.
+"""
+
+from __future__ import annotations
+
+from dataclasses import dataclass, field
+from datetime import timedelta
+
+from .decisions import DecisionSurface
+from .dispatcher import Dispatcher
+from .models import Status, now
+from .speculation import SpeculationEngine
+from .trust import TrustLedger
+from .verification import VerificationRunner
+
+
+@dataclass
+class Metrics:
+    dispatched: int = 0
+    claims: int = 0
+    claims_rejected: int = 0
+    verified: int = 0
+    escalations_raised: int = 0
+    questions_asked: int = 0
+    interruptions: int = 0
+    speculative_cost: float = 0.0
+    held: int = 0
+
+
+@dataclass
+class Conductor:
+    graph: object
+    verifier: VerificationRunner
+    dispatcher: Dispatcher
+    surface: DecisionSurface
+    speculation: SpeculationEngine
+    trust: TrustLedger
+    events: list[str] = field(default_factory=list)
+    metrics: Metrics = field(default_factory=Metrics)
+    silence_hours: float = 4.0
+
+    def emit(self, msg: str) -> None:
+        self.events.append(f"{now().isoformat(timespec='seconds')}  {msg}")
+
+    # ------------------------------------------------------------------
+    def tick(self) -> None:
+        self._verify_claims()
+        self._recover()
+        self._surface_judgment()
+        self._compress()
+        self._speculate()
+        self._dispatch()
+
+    def run(self, ticks: int = 12) -> None:
+        for _ in range(ticks):
+            self.tick()
+            if not self._work_remaining():
+                break
+
+    def _work_remaining(self) -> bool:
+        return any(c.status not in (Status.DONE, Status.BLOCKED) for c in self.graph)
+
+    # ------------------------------------------------------------------
+    def _verify_claims(self) -> None:
+        """Done is a claim, not a fact. This is where claims meet reality."""
+        for cm in self.graph.claimed():
+            self.metrics.claims += 1
+            passed = self.verifier.verify(cm)
+            self.trust.record(cm.owner, cm.work_kind, passed)
+            worker = self.graph.resources.get(cm.owner or "")
+            if worker:
+                worker.record_claim(passed)
+            budget = self.dispatcher.budget_for(cm.reviewer or "")
+            # A rejected claim costs the human nothing. That is the point.
+            budget.release(cm, consumed=passed)
+            if passed:
+                self.metrics.verified += 1
+                if cm.branch:
+                    self.emit(f"MERGE {cm.branch} <- verified: {cm.title}")
+            else:
+                self.metrics.claims_rejected += 1
+                self.emit(f"REJECT {cm.title}: {cm.evidence.detail[:90]}")
+
+    def _recover(self) -> None:
+        """Graduated protocols. Rejected work goes back with the failure as
+        context; silence escalates by stages; repeated failure becomes a
+        question for a human."""
+        for cm in self.graph:
+            if cm.status is Status.REJECTED:
+                if cm.attempts >= 3:
+                    self._escalate(cm,
+                        f"{cm.title} has failed verification {cm.attempts} times",
+                        ["reassign to a human", "reduce scope", "drop it"],
+                        key=f"repeat-failure:{cm.work_kind}")
+                else:
+                    cm.status = Status.PENDING
+                    cm.log(f"recovery: re-dispatch with failure context "
+                           f"({cm.evidence.detail[:60]})")
+            elif cm.status is Status.DISPATCHED:
+                hours = cm.silent_for / timedelta(hours=1)
+                if hours >= self.silence_hours * 3 and cm.recovery_stage < 2:
+                    cm.recovery_stage = 2
+                    self._escalate(cm, f"{cm.title} has been silent for {hours:.0f}h",
+                                   ["reassign to an agent", "extend", "drop"],
+                                   key=f"silence:{cm.owner}")
+                elif hours >= self.silence_hours and cm.recovery_stage < 1:
+                    cm.recovery_stage = 1
+                    cm.log("recovery stage 1: soft status request sent")
+
+    def _escalate(self, cm, question: str, options: list[str], key: str) -> None:
+        self.metrics.escalations_raised += 1
+        cm.status = Status.ESCALATED
+        d = self.surface.raise_question(question, options, key, cm.id)
+        cm.log(f"escalated into {d.id}")
+
+    def _compress(self) -> None:
+        self.metrics.questions_asked = len(self.surface.open) + len(self.surface.answered)
+
+    def _speculate(self) -> None:
+        """Do not wait on the human. Build every plausible answer meanwhile."""
+        for d in self.surface.queue():
+            if any(b.decision_id == d.id for b in self.speculation.branches.values()):
+                continue
+            if self.speculation.budget_exhausted(d.id):
+                continue
+            made = self.speculation.fork(d, self._speculative_plan)
+            if made:
+                self.emit(f"SPEC  {d.id} forked into {len(made)} branches while waiting")
+
+    def _speculative_plan(self, option: str, blocked_cm):
+        """Planner hook: what becomes possible if this answer holds."""
+        from .models import Commitment, Evidence, EvidenceKind
+        token = f"SPEC_{abs(hash(option)) % 9973}"
+        cm = Commitment.new(
+            title=f"{blocked_cm.title} (assuming: {option})",
+            evidence=Evidence(EvidenceKind.COMMAND,
+                              spec=f"grep -q {token} spec_{blocked_cm.id}.txt",
+                              description=f"artifact proves the {option} path"),
+            work_kind=blocked_cm.work_kind, review_cost_minutes=5)
+        cm.artifact_path = f"spec_{blocked_cm.id}.txt"
+        cm.expected_token = token
+        return [cm]
+
+    def _surface_judgment(self) -> None:
+        """A judgment call is not work. It is a question. Dispatching it to a
+        human and watching it sit in `held` is the mistake every tracker makes:
+        it models the decision as a task with an assignee and a due date."""
+        for cm in self.graph.ready():
+            if cm.ambiguous and cm.status is not Status.ESCALATED:
+                opts = cm.options or ["option A", "option B", "option C"]
+                self._escalate(cm, cm.title, opts, key=f"judgment:{cm.id}")
+
+    def _dispatch(self) -> None:
+        for cm in self.graph.ready():
+            if self.dispatcher.dispatch(cm):
+                self.metrics.dispatched += 1
+            elif cm.status is Status.HELD:
+                self.metrics.held += 1
+
+    # ------------------------------------------------------------------
+    def answer(self, decision_id: str, choice: str) -> None:
+        """The human spends attention. Everything downstream resolves at once."""
+        self.metrics.interruptions += 1
+        d = self.surface.answer(decision_id, choice)
+        keep, dropped = self.speculation.resolve(d)
+        for cid in d.blocked:
+            cm = self.graph.get(cid)
+            if cm.status is Status.ESCALATED:
+                cm.status = Status.PENDING
+                cm.log(f"unblocked by {d.id} = {choice!r}")
+        self.emit(f"ANSWER {d.id} = {choice!r}: unblocked {len(d.blocked)}, "
+                  f"kept {1 if keep else 0} branch, discarded {len(dropped)}")
