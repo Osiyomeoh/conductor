@@ -1,4 +1,4 @@
-import type { State, Team, DecisionDetail, Plan, Activity, RealState } from "./types";
+import type { State, Team, DecisionDetail, Plan, Activity, RealState, RepoConnect } from "./types";
 
 // Thin typed client. Every call returns a typed promise, so a view that reads
 // a field the API does not send fails to compile.
@@ -30,4 +30,9 @@ export const api = {
   realState: () => get<RealState>("/api/real/state"),
   realRun: (ticks: number, live: boolean) => post<RealState>("/api/real/run", { ticks, live }),
   realReset: (live: boolean) => post<RealState>("/api/real/reset", { live }),
+  repoStatus: () => get<RepoConnect>("/api/repo"),
+  repoConnect: (path: string) => post<RepoConnect>("/api/repo/connect", { path }),
+  repoTask: (t: { title: string; file: string; check: string }) => post<RepoConnect>("/api/repo/task", t),
+  repoRun: (ticks: number) => post<RepoConnect>("/api/repo/run", { ticks }),
+  repoDisconnect: () => post<RepoConnect>("/api/repo/disconnect", {}),
 };

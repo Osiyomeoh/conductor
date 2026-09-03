@@ -158,6 +158,91 @@ async def api_real_reset(request: Request, p: Principal = Depends(caller)):
         return real_state(_real_conductor(live))
 
 
+# --- connect your own repo (gated, local/authenticated) --------------------
+_repo_lock = __import__("threading").RLock()
+_repo: dict = {"c": None, "path": None}
+
+
+def _require_repo_enabled():
+    from .userrepo import repo_enabled
+    if not repo_enabled():
+        raise HTTPException(status_code=403, detail=(
+            "real-repo execution is disabled. It runs task checks as real "
+            "commands against your repository, so it is off by default. Enable it "
+            "deliberately, locally, with CONDUCTOR_ALLOW_REPO=1."))
+
+
+def _repo_payload():
+    from .server import real_state
+    out = {"enabled": True, "connected": _repo["c"] is not None,
+           "path": _repo["path"]}
+    if _repo["c"] is not None:
+        from .planning import live_available
+        out.update(real_state(_repo["c"]))
+        out["live"] = live_available()
+    return out
+
+
+@app.get("/api/repo")
+def api_repo_status(p: Principal = Depends(caller)):
+    from .userrepo import repo_enabled
+    if not repo_enabled():
+        return {"enabled": False, "connected": False}
+    with _repo_lock:
+        return _repo_payload()
+
+
+@app.post("/api/repo/connect")
+async def api_repo_connect(request: Request, p: Principal = Depends(caller)):
+    _require_repo_enabled()
+    from .userrepo import build_for_repo, validate_repo
+    body = await _json(request)
+    ok, resolved = validate_repo(body.get("path", ""))
+    if not ok:
+        raise HTTPException(status_code=400, detail=resolved)
+    with _repo_lock:
+        _repo["c"] = build_for_repo(resolved)
+        _repo["path"] = resolved
+        return _repo_payload()
+
+
+@app.post("/api/repo/task")
+async def api_repo_task(request: Request, p: Principal = Depends(caller)):
+    _require_repo_enabled()
+    from .userrepo import add_task
+    body = await _json(request)
+    if _repo["c"] is None:
+        raise HTTPException(status_code=400, detail="connect a repository first")
+    for f in ("title", "file", "check"):
+        if not (body.get(f) or "").strip():
+            raise HTTPException(status_code=400, detail=f"{f} is required")
+    with _repo_lock:
+        add_task(_repo["c"], body["title"], body["file"], body["check"],
+                 body.get("work_kind", "code"))
+        return _repo_payload()
+
+
+@app.post("/api/repo/run")
+async def api_repo_run(request: Request, p: Principal = Depends(caller)):
+    _require_repo_enabled()
+    body = await _json(request)
+    if _repo["c"] is None:
+        raise HTTPException(status_code=400, detail="connect a repository first")
+    ticks = max(1, min(12, int(body.get("ticks", 6))))
+    with _repo_lock:
+        _repo["c"].run(ticks=ticks)
+        return _repo_payload()
+
+
+@app.post("/api/repo/disconnect")
+def api_repo_disconnect(p: Principal = Depends(caller)):
+    _require_repo_enabled()
+    with _repo_lock:
+        _repo["c"] = None
+        _repo["path"] = None
+        return {"enabled": True, "connected": False}
+
+
 @app.post("/api/reset")
 def api_reset(p: Principal = Depends(caller)):
     """Rebuild this tenant from a fresh seed. The guided demo calls this so a

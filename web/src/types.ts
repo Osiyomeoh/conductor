@@ -111,6 +111,13 @@ export interface RealState extends State {
   live?: boolean;
 }
 
+export interface RepoConnect extends Partial<RealState> {
+  enabled: boolean;
+  connected: boolean;
+  path?: string | null;
+  live?: boolean;
+}
+
 export interface ActivityEvent {
   seq: number; at: string; kind: string; tone: string; verb: string;
   actor: string | null; title: string | null; detail: string;

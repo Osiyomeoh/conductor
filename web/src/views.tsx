@@ -259,6 +259,129 @@ export function RealView() {
   </>);
 }
 
+export function RepoView() {
+  const [s, setS] = useState<import("./types").RepoConnect | null>(null);
+  const [path, setPath] = useState("");
+  const [task, setTask] = useState({ title: "", file: "", check: "" });
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+  useEffect(() => { void api.repoStatus().then(setS).catch(() => {}); }, []);
+
+  const guard = async (fn: () => Promise<import("./types").RepoConnect>) => {
+    setBusy(true); setErr(null);
+    try { setS(await fn()); }
+    catch (e) { setErr(e instanceof Error ? e.message : "failed"); }
+    finally { setBusy(false); }
+  };
+  const connect = () => guard(() => api.repoConnect(path));
+  const addTask = () => guard(async () => { const r = await api.repoTask(task); setTask({ title: "", file: "", check: "" }); return r; });
+  const run = () => guard(() => api.repoRun(8));
+  const disconnect = () => guard(() => api.repoDisconnect());
+
+  if (!s) return <><Head title="Your repo" sub="loading" /><div className="vbody" /></>;
+
+  if (!s.enabled) return (<>
+    <Head title="Your repo" sub="connect a real repository you own" />
+    <div className="vbody"><div className="vwrap">
+      <div className="card lockcard">
+        <div className="lockttl">Real-repo execution is off by default</div>
+        <div className="lockbody">
+          Connecting a repo lets Conductor run each task's check as a real command
+          against your code. That is real code execution, so it is never enabled on
+          the public demo. Turn it on deliberately, on your own machine:
+          <pre className="mono lockpre">CONDUCTOR_ALLOW_REPO=1 CONDUCTOR_PROVIDER=gemini \
+GEMINI_API_KEY=… python serve.py</pre>
+          Then reload this page. Conductor writes into isolated git worktrees off
+          your base branch and merges only what passes. It never pushes to a remote.
+        </div>
+      </div>
+    </div></div>
+  </>);
+
+  const board = s.board ?? [];
+  const m = s.metrics;
+  return (<>
+    <Head title="Your repo" sub={s.connected ? s.path ?? "" : "connect a real repository you own"}
+      actions={s.connected
+        ? <><button className="b" onClick={() => void disconnect()} disabled={busy}>Disconnect</button>
+            <button className="b primary" onClick={() => void run()} disabled={busy || board.length === 0}>{busy ? "Running…" : "Run the loop"}</button></>
+        : undefined} />
+    <div className="vbody"><div className="vwrap">
+      {err && <div className="card errcard">{err}</div>}
+
+      {!s.connected ? (
+        <div className="card connectcard">
+          <div className="label">Connect a local git repository</div>
+          <div className="connectrow">
+            <input className="input mono" placeholder="/Users/you/code/my-project" value={path}
+              onChange={(e) => setPath(e.target.value)} />
+            <button className="b primary" onClick={() => void connect()} disabled={busy || !path.trim()}>Connect</button>
+          </div>
+          <div className="realnote" style={{ marginTop: 12 }}>
+            A local path to a git repo. Conductor operates only in throwaway
+            worktrees off your base branch and merges verified work into your local
+            base. It never pushes.
+          </div>
+        </div>
+      ) : (<>
+        {s.live === false && <div className="card errcard">No live agent configured. Set CONDUCTOR_PROVIDER=gemini and GEMINI_API_KEY so the worker can write code.</div>}
+
+        <div className="card taskcard">
+          <div className="label">Add a task</div>
+          <div className="taskgrid">
+            <input className="input" placeholder="Task — e.g. Implement slugify(text)" value={task.title}
+              onChange={(e) => setTask({ ...task, title: e.target.value })} />
+            <input className="input mono" placeholder="target file — e.g. slugify.py" value={task.file}
+              onChange={(e) => setTask({ ...task, file: e.target.value })} />
+            <input className="input mono" placeholder="check command — e.g. python -c &quot;import slugify; assert slugify.slugify('A B')=='a-b'&quot;" value={task.check}
+              onChange={(e) => setTask({ ...task, check: e.target.value })} />
+            <button className="b" onClick={() => void addTask()}
+              disabled={busy || !task.title.trim() || !task.file.trim() || !task.check.trim()}>Add task</button>
+          </div>
+          <div className="realnote" style={{ marginTop: 10 }}>
+            The check command is your definition of done. The agent writes the file
+            to satisfy it; the command runs for real; only a pass merges.
+          </div>
+        </div>
+
+        {m && (
+          <div className="realfigs">
+            <div className="fig fail"><div className="n">{m.claims_rejected}</div><div className="l">caught before merge</div></div>
+            <div className="fig pass"><div className="n">{m.verified}</div><div className="l">verified &amp; merged</div></div>
+            <div className="fig ink"><div className="n">{s.in_flight ?? 0}</div><div className="l">in flight</div></div>
+          </div>
+        )}
+
+        <div className="realgrid">
+          <div className="section">
+            <div className="label">Tasks</div>
+            <div className="card">
+              {board.length === 0 && <div className="note" style={{ padding: 16 }}>No tasks yet. Add one above.</div>}
+              {board.map((x) => (
+                <div className={`row ${x.status === "rejected" ? "fail" : ""}`} key={x.id}>
+                  <span className={`chip c-${x.status}`}>{x.status.replace("_", " ")}</span>
+                  <div><span className="t">{x.title}</span>
+                    <div className="why mono">{x.evidence.spec}</div></div>
+                  <span className="cost">{x.attempts > 0 ? `try ${x.attempts}` : ""}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+          <div className="section">
+            <div className="label">Base branch history</div>
+            <div className="gitlog card">
+              {(s.repo?.log ?? []).map((ln, i) => (
+                <div className={`gitline ${ln.includes("conductor: merge") ? "merge" : ""}`} key={i}><span className="mono">{ln}</span></div>
+              ))}
+              {(!s.repo?.log || s.repo.log.length === 0) && <div className="note" style={{ padding: 16 }}>No commits from Conductor yet.</div>}
+            </div>
+          </div>
+        </div>
+      </>)}
+    </div></div>
+  </>);
+}
+
 export function TeamView() {
   const [t, setT] = useState<Team | null>(null);
   useEffect(() => { void api.team().then(setT); }, []);

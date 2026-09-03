@@ -626,6 +626,38 @@ def test_asgi_real_execution_merges_only_verified(monkeypatch):
     assert c.get("/api/decision?id=nope").status_code == 404
 
 
+def test_asgi_repo_flow_gated_and_validated(monkeypatch, tmp_path):
+    """Connecting a real repo is off unless CONDUCTOR_ALLOW_REPO=1 (it runs real
+    commands against the repo). When on, only an actual git repo connects, and a
+    task can be added; a live agent then does the work behind the same gate."""
+    monkeypatch.setenv("CONDUCTOR_REQUIRE_AUTH", "0")
+    monkeypatch.delenv("CONDUCTOR_ALLOW_REPO", raising=False)
+    c, _ = _client()
+    assert c.get("/api/repo").json()["enabled"] is False
+    assert c.post("/api/repo/connect", json={"path": str(tmp_path)}).status_code == 403
+
+    monkeypatch.setenv("CONDUCTOR_ALLOW_REPO", "1")
+    c, _ = _client()
+    assert c.get("/api/repo").json() == {"enabled": True, "connected": False, "path": None}
+    # A non-repo directory is rejected.
+    assert c.post("/api/repo/connect", json={"path": str(tmp_path)}).status_code == 400
+    # A real git repo connects.
+    import subprocess
+    for args in (["init", "-q"], ["config", "user.email", "t@t"],
+                 ["config", "user.name", "t"]):
+        subprocess.run(["git", "-C", str(tmp_path), *args], check=True)
+    (tmp_path / "README.md").write_text("# x\n")
+    subprocess.run(["git", "-C", str(tmp_path), "add", "-A"], check=True)
+    subprocess.run(["git", "-C", str(tmp_path), "commit", "-q", "-m", "base"], check=True)
+    r = c.post("/api/repo/connect", json={"path": str(tmp_path)})
+    assert r.status_code == 200 and r.json()["connected"] is True
+    # A task needs all three fields.
+    assert c.post("/api/repo/task", json={"title": "x", "file": "x.py"}).status_code == 400
+    r = c.post("/api/repo/task", json={"title": "Implement f", "file": "f.py",
+                                       "check": "python3 -c 'import f'"})
+    assert r.status_code == 200 and len(r.json()["board"]) == 1
+
+
 def test_asgi_enforced_auth_and_tenant_isolation(monkeypatch):
     monkeypatch.setenv("CONDUCTOR_REQUIRE_AUTH", "1")
     monkeypatch.setenv("CONDUCTOR_SESSION_SECRET", "test-secret")

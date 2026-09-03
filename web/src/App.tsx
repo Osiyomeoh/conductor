@@ -1,15 +1,16 @@
 import { useEffect, useState } from "react";
 import { useConductor, useTheme } from "./hooks";
 import { Glyph } from "./logo";
-import { ActivityView, BoardView, CostView, DecisionsView, DecisionOverlay, HomeView, PlanOverlay, RealView, TeamView } from "./views";
+import { ActivityView, BoardView, CostView, DecisionsView, DecisionOverlay, HomeView, PlanOverlay, RealView, RepoView, TeamView } from "./views";
 
-type ViewName = "home" | "board" | "decisions" | "activity" | "real" | "team" | "cost";
+type ViewName = "home" | "board" | "decisions" | "activity" | "real" | "repo" | "team" | "cost";
 const NAV: { view: ViewName; icon: string; label: string }[] = [
   { view: "home", icon: "◎", label: "Home" },
   { view: "board", icon: "▤", label: "Board" },
   { view: "decisions", icon: "◇", label: "Decisions" },
   { view: "activity", icon: "≋", label: "Activity" },
   { view: "real", icon: "⎇", label: "Real execution" },
+  { view: "repo", icon: "⌥", label: "Your repo" },
   { view: "team", icon: "◐", label: "Team" },
   { view: "cost", icon: "$", label: "Cost & trust" },
 ];
@@ -55,6 +56,7 @@ export function App() {
         {view === "decisions" && <DecisionsView s={state} onOpen={setOpenDecision} onAnswer={(id, c) => void answer(id, c)} />}
         {view === "activity" && <ActivityView />}
         {view === "real" && <RealView />}
+        {view === "repo" && <RepoView />}
         {view === "team" && <TeamView />}
         {view === "cost" && <CostView s={state} />}
       </main>

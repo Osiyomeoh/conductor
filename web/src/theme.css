@@ -233,3 +233,22 @@ button.b.primary{background:var(--accent);border-color:var(--accent);color:#0419
 .filebody{margin:0;padding:12px 14px;font-size:12px;line-height:1.5;color:var(--t1);
   white-space:pre-wrap;overflow-x:auto}
 .dim{color:var(--t3)}
+
+/* connect your own repo */
+.lockcard{padding:26px 28px;max-width:720px}
+.lockttl{font-size:15px;font-weight:600;color:var(--t1);margin-bottom:10px}
+.lockbody{font-size:13px;color:var(--t2);line-height:1.6}
+.lockpre{background:var(--e2);border:1px solid var(--line);border-radius:8px;padding:12px 14px;
+  margin:12px 0;font-size:12px;color:var(--t1);white-space:pre-wrap;overflow-x:auto}
+.connectcard,.taskcard{padding:20px 22px;margin-bottom:22px}
+.connectrow{display:flex;gap:10px;margin-top:12px}
+.connectrow .input{flex:1}
+.input{background:var(--e1);border:1px solid var(--line);border-radius:9px;padding:10px 12px;
+  font-size:13px;color:var(--t1);font-family:var(--sans);outline:none;width:100%}
+.input:focus{border-color:var(--accent)}
+.input.mono{font-family:var(--mono);font-size:12px}
+.taskgrid{display:grid;grid-template-columns:1fr 1fr auto;gap:10px;margin-top:12px}
+.taskgrid .input:nth-child(3){grid-column:1 / -1}
+@media(max-width:820px){.taskgrid{grid-template-columns:1fr}}
+.errcard{padding:12px 16px;margin-bottom:16px;color:var(--fail);background:var(--fail-wash);
+  border-color:var(--fail-bg);font-size:13px}
