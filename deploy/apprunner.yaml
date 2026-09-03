@@ -1,0 +1,68 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: Conductor web UI on AWS App Runner — a permanent public URL for the
+  always-on ASGI service (React SPA + control loop) built from an ECR image.
+
+Parameters:
+  ImageUri:
+    Type: String
+    Description: ECR image URI (with tag) for the conductor web image.
+
+Resources:
+  # App Runner assumes this role to pull the image from ECR.
+  EcrAccessRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: conductor-apprunner-ecr
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal: { Service: build.apprunner.amazonaws.com }
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSAppRunnerServicePolicyForECRAccess
+
+  AutoScaling:
+    Type: AWS::AppRunner::AutoScalingConfiguration
+    Properties:
+      AutoScalingConfigurationName: conductor-web
+      MinSize: 1
+      MaxSize: 2
+      MaxConcurrency: 50
+
+  Service:
+    Type: AWS::AppRunner::Service
+    Properties:
+      ServiceName: conductor-web
+      AutoScalingConfigurationArn: !Ref AutoScaling
+      SourceConfiguration:
+        AutoDeploymentsEnabled: false
+        AuthenticationConfiguration:
+          AccessRoleArn: !GetAtt EcrAccessRole.Arn
+        ImageRepository:
+          ImageIdentifier: !Ref ImageUri
+          ImageRepositoryType: ECR
+          ImageConfiguration:
+            Port: "8080"
+            RuntimeEnvironmentVariables:
+              - Name: CONDUCTOR_REQUIRE_AUTH
+                Value: "0"                 # public demo: every request is the demo tenant
+              - Name: CONDUCTOR_AWS_PROFILE
+                Value: ""                  # no local profile in the cloud
+              - Name: CONDUCTOR_WORK_DIR
+                Value: "/tmp/conductor-work"
+      InstanceConfiguration:
+        Cpu: "1024"                        # 1 vCPU
+        Memory: "2048"                     # 2 GB
+      HealthCheckConfiguration:
+        Protocol: HTTP
+        Path: /api/health
+        Interval: 10
+        Timeout: 5
+        HealthyThreshold: 1
+        UnhealthyThreshold: 5
+
+Outputs:
+  ServiceUrl:
+    Description: The permanent public URL for the Conductor web UI.
+    Value: !Sub "https://${Service.ServiceUrl}"
