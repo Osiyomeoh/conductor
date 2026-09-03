@@ -245,3 +245,63 @@ def test_nothing_reaches_done_without_passing_evidence():
     for x in c.graph:
         if x.status is Status.DONE:
             assert x.evidence.passed is True, f"{x.title} is done without proof"
+
+
+# --- persistence ------------------------------------------------------------
+
+def test_replay_reconstructs_the_run_exactly(tmp_path):
+    """The state IS the log. If a rebuilt graph disagrees with the live one,
+    the loop cannot be resumed and a run cannot be audited."""
+    from conductor.events import JsonlStore
+    from conductor.graph import CommitmentGraph
+    from conductor.replay import rebuild
+
+    log = str(tmp_path / "c.jsonl")
+    c = build(store=JsonlStore(log))
+    c.run(ticks=6)
+    q = [d for d in c.surface.queue() if len(d.options) >= 2]
+    if q:
+        c.answer(q[0].id, q[0].options[0])
+        c.run(ticks=6)
+
+    live = {x.id: x.status for x in c.graph}
+    fresh = CommitmentGraph()
+    rebuild(fresh, JsonlStore(log).read())
+    assert {x.id: x.status for x in fresh} == live
+
+
+def test_replay_does_not_re_record(tmp_path):
+    """Replaying facts must rebuild history, not duplicate it."""
+    from conductor.events import JsonlStore
+
+    log = str(tmp_path / "c.jsonl")
+    c = build(store=JsonlStore(log))
+    c.run(ticks=4)
+    before = sum(1 for _ in open(log))
+    c.resume()
+    assert sum(1 for _ in open(log)) == before
+
+
+def test_tenants_are_isolated(tmp_path):
+    """One log, many teams. A tenant must never see another's work."""
+    from conductor.events import EventKind, JsonlStore, Recorder
+
+    store = JsonlStore(str(tmp_path / "c.jsonl"))
+    a, b = Recorder(store, "team_a"), Recorder(store, "team_b")
+    a.record(EventKind.PLANNED, commitment_id="cm_a")
+    b.record(EventKind.PLANNED, commitment_id="cm_b")
+    assert [e.commitment_id for e in a.history()] == ["cm_a"]
+    assert [e.commitment_id for e in b.history()] == ["cm_b"]
+
+
+def test_sequence_continues_across_restarts(tmp_path):
+    """A resumed recorder must not reuse sequence numbers already on disk."""
+    from conductor.events import EventKind, JsonlStore, Recorder
+
+    path = str(tmp_path / "c.jsonl")
+    r1 = Recorder(JsonlStore(path))
+    for _ in range(3):
+        r1.record(EventKind.PLANNED, commitment_id="x")
+    r2 = Recorder(JsonlStore(path))
+    e = r2.record(EventKind.DISPATCHED, commitment_id="x")
+    assert e.seq == 4

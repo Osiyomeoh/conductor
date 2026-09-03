@@ -13,17 +13,36 @@ from .models import Commitment, Resource, Status, now
 
 
 class CommitmentGraph:
-    def __init__(self) -> None:
+    def __init__(self, recorder=None) -> None:
         self.commitments: dict[str, Commitment] = {}
         self.resources: dict[str, Resource] = {}
+        # Optional, so the graph stays usable in tests without a store.
+        self.recorder = recorder
 
     # construction -------------------------------------------------------
     def add(self, cm: Commitment) -> Commitment:
         self.commitments[cm.id] = cm
+        if self.recorder is not None:
+            # A commitment entering the graph is the first fact about it, and
+            # it carries everything replay needs to recreate the node.
+            from .events import EventKind
+            self.recorder.record(
+                EventKind.PLANNED, commitment_id=cm.id, title=cm.title,
+                evidence_kind=cm.evidence.kind.value, evidence_spec=cm.evidence.spec,
+                work_kind=cm.work_kind, review_cost_minutes=cm.review_cost_minutes,
+                ambiguous=cm.ambiguous, consequential=cm.consequential,
+                options=cm.options, dependencies=cm.dependencies,
+                artifact_path=cm.artifact_path, expected_token=cm.expected_token,
+                speculative_for=cm.speculative_for, branch=cm.branch)
         return cm
 
     def add_resource(self, r: Resource) -> Resource:
         self.resources[r.id] = r
+        if self.recorder is not None:
+            from .events import EventKind
+            self.recorder.record(EventKind.HIRED, actor=r.id, name=r.name,
+                                 type=r.type.value, skills=r.skills,
+                                 principal=r.principal, scopes=r.scopes)
         return r
 
     # queries ------------------------------------------------------------

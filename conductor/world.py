@@ -8,6 +8,7 @@ import shutil
 from .attention import AttentionBudget
 from .decisions import DecisionSurface
 from .dispatcher import Dispatcher
+from .events import Recorder
 from .graph import CommitmentGraph
 from .loop import Conductor
 from .models import Commitment, Evidence, EvidenceKind, Resource, ResourceType
@@ -32,11 +33,12 @@ def _cm(title, token, kind, **kw) -> Commitment:
     return cm
 
 
-def build(seed: int = 7) -> Conductor:
+def build(seed: int = 7, store=None, tenant: str = "default") -> Conductor:
     shutil.rmtree(WORKDIR, ignore_errors=True)
     os.makedirs(WORKDIR, exist_ok=True)
 
-    g = CommitmentGraph()
+    recorder = Recorder(store, tenant)
+    g = CommitmentGraph(recorder=recorder)
     g.add_resource(Resource("human_sam", ResourceType.HUMAN, "Sam", ["product", "judgment"]))
     g.add_resource(Resource("human_sarah", ResourceType.HUMAN, "Sarah", ["design"]))
     g.add_resource(Resource("agent_impl", ResourceType.AGENT, "impl-agent", ["code"]))
@@ -84,4 +86,5 @@ def build(seed: int = 7) -> Conductor:
     surface = DecisionSurface(graph=g)
     spec = SpeculationEngine(graph=g, ledger=cost)
     return Conductor(graph=g, verifier=verifier, dispatcher=disp, surface=surface,
-                     speculation=spec, trust=trust, cost=cost)
+                     speculation=spec, trust=trust, cost=cost,
+                     recorder=recorder)
