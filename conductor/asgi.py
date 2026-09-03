@@ -28,6 +28,13 @@ from .world import persistent
 
 log = logging.getLogger("conductor.asgi")
 
+# The React + TypeScript app, built to web/dist, is served at /app when present.
+# Falls back to the hand-rolled vanilla page if the frontend has not been built.
+import os
+_WEB_DIST = os.path.join(os.path.dirname(os.path.dirname(__file__)), "web", "dist")
+_REACT_INDEX = os.path.join(_WEB_DIST, "index.html")
+_REACT_BUILT = os.path.isfile(_REACT_INDEX)
+
 app = FastAPI(title="Conductor", version="1.0")
 registry = Registry(build_fn=lambda store, tenant: persistent(store=store, tenant=tenant))
 
@@ -146,10 +153,22 @@ def onboarding():
     return HTMLResponse(open(ONBOARDING).read())
 
 
+@app.get("/app/assets/{asset:path}")
+def react_assets(asset: str):
+    """Serve the built React bundle's hashed, content-addressed assets."""
+    path = os.path.join(_WEB_DIST, "assets", os.path.basename(asset))
+    if _REACT_BUILT and os.path.isfile(path):
+        return FileResponse(path, headers={"cache-control": "public, max-age=31536000, immutable"})
+    raise HTTPException(status_code=404)
+
+
 @app.get("/{path:path}", response_class=HTMLResponse)
 def spa(path: str):
     if path.startswith("api") or path.startswith("shot"):
         raise HTTPException(status_code=404)
+    # The React app owns /app; the vanilla page remains the fallback.
+    if _REACT_BUILT and (path == "app" or path.startswith("app")):
+        return HTMLResponse(open(_REACT_INDEX).read())
     return HTMLResponse(open(UI).read())
 
 

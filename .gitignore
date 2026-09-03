@@ -7,3 +7,5 @@ __pycache__/
 agentcore/.env.local
 CLAUDE.md
 .claude/
+web/node_modules/
+web/*.tsbuildinfo
