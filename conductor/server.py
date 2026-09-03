@@ -79,6 +79,7 @@ def state(c) -> dict:
         "metrics": vars(c.metrics),
         "events": [e[11:] for e in c.events[-40:]][::-1],
         "compression": c.surface.compression_ratio,
+        "in_flight": sum(1 for x in g if x.status.value in ("dispatched", "claimed_done")),
     }
 
 

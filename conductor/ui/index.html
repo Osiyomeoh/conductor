@@ -2,185 +2,302 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Conductor</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap">
 <style>
+/* Dark is the design's native world; light is derived from the same tokens.
+   Three states: bare :root = light default, prefers-color-scheme swaps the OS
+   default, and [data-theme] lets the toggle win in either direction. */
 :root{
-  --ink:#12151c; --paper:#f4f5f8; --card:#fff; --line:#dde1e9; --mid:#5b6478;
-  --faint:#8c93a3; --accent:#4c5fd7; --accent-soft:#eef0fc;
-  --pass:#1f8a70; --fail:#b3452c; --held:#9a6b12; --grid:#e8ebf1;
+  --ground:#fbfbfd; --surface:#ffffff;
+  --e1:rgba(10,12,20,.015); --e2:rgba(10,12,20,.04); --e3:rgba(10,12,20,.07);
+  --line:rgba(10,12,20,.09); --line-strong:rgba(10,12,20,.14);
+  --t1:#12151c; --t2:#5b6472; --t3:#8b93a1;
+  --accent:#4c5fd7;
+  --pass:#0f9d76; --pass-bg:rgba(15,157,118,.10);
+  --fail:#d1462a; --fail-bg:rgba(209,70,42,.10); --fail-wash:rgba(209,70,42,.055);
+  --held:#b0791a; --held-bg:rgba(176,121,26,.12);
+  --mono:"JetBrains Mono",ui-monospace,"SF Mono",Menlo,monospace;
+  --sans:"Inter",-apple-system,system-ui,"Segoe UI",sans-serif;
 }
-@media (prefers-color-scheme:dark){:root{
-  --ink:#e6e9f0; --paper:#0d1117; --card:#151a23; --line:#28303d; --mid:#98a1b4;
-  --faint:#6c7689; --accent:#8a97ec; --accent-soft:#1b2240;
-  --pass:#4bbd9c; --fail:#e08163; --held:#d8a949; --grid:#1e2530;
-}}
-*{box-sizing:border-box}
-body{margin:0;background:var(--paper);color:var(--ink);
-  font:400 14px/1.55 ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif}
-.mono{font-family:ui-monospace,"SF Mono",Menlo,monospace}
-header{padding:26px 28px 20px;border-bottom:1px solid var(--line);background:var(--card)}
-h1{margin:0;font-size:13px;letter-spacing:.16em;text-transform:uppercase;
-  color:var(--accent);font-weight:600;font-family:ui-monospace,Menlo,monospace}
-.headline{margin:12px 0 4px;font-size:29px;font-weight:600;letter-spacing:-.02em}
-.sub{color:var(--mid);font-size:14px}
-main{display:grid;grid-template-columns:minmax(0,1.35fr) minmax(280px,.65fr);
-  gap:22px;padding:22px 28px 60px;max-width:1400px}
-@media(max-width:960px){main{grid-template-columns:1fr}}
-section{margin-bottom:26px}
-h2{font-size:11px;letter-spacing:.13em;text-transform:uppercase;color:var(--faint);
-  margin:0 0 10px;font-family:ui-monospace,Menlo,monospace;font-weight:600}
-.card{background:var(--card);border:1px solid var(--line);border-radius:9px;padding:16px}
-.q{background:var(--card);border:1px solid var(--held);border-left:3px solid var(--held);
-  border-radius:9px;padding:18px;margin-bottom:12px}
-.q h3{margin:0 0 6px;font-size:17px;font-weight:600;letter-spacing:-.01em}
-.qmeta{color:var(--mid);font-size:12.5px;margin-bottom:14px}
-.qmeta b{color:var(--ink);font-weight:600}
-.opts{display:flex;flex-wrap:wrap;gap:8px}
-button{font:inherit;cursor:pointer;border-radius:6px;border:1px solid var(--line);
-  background:var(--card);color:var(--ink);padding:8px 13px;transition:.12s}
-button:hover{border-color:var(--accent);background:var(--accent-soft)}
+:root[data-theme="dark"],
+:root:not([data-theme="light"]){}
+.dk{
+  --ground:#08090a; --surface:#0f1011;
+  --e1:rgba(255,255,255,.02); --e2:rgba(255,255,255,.05); --e3:rgba(255,255,255,.08);
+  --line:rgba(255,255,255,.08); --line-strong:rgba(255,255,255,.12);
+  --t1:#f7f8f8; --t2:#8a8f98; --t3:#62666d;
+  --accent:#6f7ff0;
+  --pass:#3fd68a; --pass-bg:rgba(39,166,68,.10);
+  --fail:#f34e52; --fail-bg:rgba(243,78,82,.10); --fail-wash:rgba(243,78,82,.06);
+  --held:#f7bf8b; --held-bg:rgba(247,191,139,.10);
+}
+*{box-sizing:border-box;margin:0}
+html{background:var(--ground)}
+body{background:var(--ground);color:var(--t1);font-family:var(--sans);
+  font-size:14px;line-height:1.5;-webkit-font-smoothing:antialiased;
+  letter-spacing:-.006em;padding:0 0 80px}
+.mono{font-family:var(--mono);font-variant-numeric:tabular-nums}
+.wrap{max-width:1240px;margin:0 auto;padding:0 32px}
+
+.top{display:flex;align-items:center;justify-content:space-between;
+  padding:18px 32px;position:sticky;top:0;z-index:20;
+  background:var(--ground);border-bottom:1px solid var(--line);
+  -webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px)}
+.brand{font-family:var(--mono);font-size:12px;letter-spacing:.16em;color:var(--t3);
+  text-transform:uppercase;font-weight:500}
+.controls{display:flex;gap:8px;align-items:center}
+
+button{font-family:var(--sans);font-size:13px;font-weight:500;cursor:pointer;
+  color:var(--t1);background:var(--e2);border:1px solid var(--line);
+  border-radius:9999px;padding:7px 15px;letter-spacing:-.006em;
+  transition:background .13s,border-color .13s,transform .13s}
+button:hover{background:var(--e3);border-color:var(--line-strong)}
+button:active{transform:translateY(1px)}
 button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
-.opts button{border-color:var(--accent);color:var(--accent);font-weight:500}
-.opts button:hover{background:var(--accent);color:#fff}
-.empty{color:var(--pass);font-size:15px;padding:22px 16px;text-align:center;
-  border:1px dashed var(--line);border-radius:9px;background:var(--card)}
-.empty span{display:block;color:var(--faint);font-size:12.5px;margin-top:5px}
-table{width:100%;border-collapse:collapse}
-td{padding:8px 10px 8px 0;border-bottom:1px solid var(--grid);vertical-align:top}
-tr:last-child td{border-bottom:0}
-.pill{display:inline-block;font-family:ui-monospace,Menlo,monospace;font-size:10px;
-  letter-spacing:.06em;text-transform:uppercase;padding:2.5px 7px;border-radius:4px;
-  border:1px solid currentColor;white-space:nowrap}
-.done{color:var(--pass)} .rejected,.escalated{color:var(--fail)}
-.held{color:var(--held)} .dispatched,.claimed_done{color:var(--accent)}
-.pending,.blocked{color:var(--faint)}
-.t{font-weight:500} .why{color:var(--mid);font-size:12px;margin-top:2px}
-.spec{color:var(--faint);font-size:10.5px;font-family:ui-monospace,Menlo,monospace}
-.meter{height:7px;background:var(--grid);border-radius:4px;overflow:hidden;margin:7px 0 4px}
-.meter i{display:block;height:100%;background:var(--accent)}
-.kv{display:flex;justify-content:space-between;gap:12px;padding:5px 0;font-size:13px}
-.kv b{font-weight:600;font-variant-numeric:tabular-nums}
-.num{font-variant-numeric:tabular-nums}
-.log{font-family:ui-monospace,Menlo,monospace;font-size:11.5px;color:var(--mid);
-  max-height:230px;overflow:auto}
-.log div{padding:2.5px 0;border-bottom:1px solid var(--grid)}
-.bar{display:flex;gap:9px;align-items:center;margin-top:16px}
-.note{color:var(--faint);font-size:12px}
+.ghost{background:transparent}
+.icon{font-size:15px;line-height:1;padding:7px 11px}
+
+.hero{padding:44px 0 30px}
+.headline{font-size:52px;font-weight:600;letter-spacing:-.022em;line-height:1.04;
+  display:flex;align-items:center;gap:18px;text-wrap:balance}
+.loop{display:inline-flex;align-items:center;gap:9px;font-family:var(--mono);
+  font-size:11px;letter-spacing:.1em;color:var(--t3);text-transform:uppercase;
+  padding-top:8px}
+.dot{width:7px;height:7px;border-radius:50%;background:var(--accent);
+  box-shadow:0 0 0 0 rgba(111,127,240,.5);animation:pulse 2.4s ease-out infinite}
+@keyframes pulse{0%{box-shadow:0 0 0 0 rgba(111,127,240,.45)}
+  70%{box-shadow:0 0 0 9px rgba(111,127,240,0)}100%{box-shadow:0 0 0 0 rgba(111,127,240,0)}}
+@media (prefers-reduced-motion:reduce){.dot{animation:none}}
+
+.figures{display:flex;gap:56px;margin-top:34px;flex-wrap:wrap}
+.fig .n{font-family:var(--mono);font-size:44px;font-weight:500;letter-spacing:-.02em;line-height:1}
+.fig .l{font-family:var(--mono);font-size:11px;letter-spacing:.09em;color:var(--t3);
+  text-transform:uppercase;margin-top:10px;max-width:210px}
+.fig.pass .n{color:var(--pass)} .fig.fail .n{color:var(--fail)}
+.fig.held .n{color:var(--held)} .fig.ink .n{color:var(--t1)}
+
+main{display:grid;grid-template-columns:minmax(0,1fr) 300px;gap:24px;margin-top:30px}
+@media(max-width:920px){main{grid-template-columns:1fr}}
+.label{font-family:var(--mono);font-size:11px;letter-spacing:.11em;color:var(--t3);
+  text-transform:uppercase;font-weight:500;margin:0 0 12px}
+section{margin-bottom:30px}
+.card{background:var(--e1);border:1px solid var(--line);border-radius:12px}
+
+.decision{padding:22px 22px 20px}
+.decision.empty{border-style:dashed;text-align:center;padding:34px 22px}
+.decision .q{font-size:20px;font-weight:600;letter-spacing:-.017em}
+.decision .meta{color:var(--t2);font-size:13px;margin-top:8px}
+.decision .meta b{color:var(--t1);font-weight:500}
+.opts{display:flex;flex-wrap:wrap;gap:9px;margin-top:18px}
+.opts button{border-color:var(--line-strong);padding:9px 16px}
+.empty .run{color:var(--pass);font-size:15px;font-weight:500}
+.empty .sub{color:var(--t3);font-size:13px;margin-top:7px;max-width:440px;
+  margin-left:auto;margin-right:auto}
+
+.row{display:grid;grid-template-columns:112px 1fr auto auto;gap:14px;align-items:start;
+  padding:13px 18px;border-top:1px solid var(--line)}
+.row:first-child{border-top:0}
+.row.fail{background:var(--fail-wash)}
+.chip{font-family:var(--mono);font-size:10px;letter-spacing:.05em;text-transform:uppercase;
+  padding:3px 9px;border-radius:9999px;font-weight:500;white-space:nowrap;justify-self:start}
+.c-done{color:var(--pass);background:var(--pass-bg)}
+.c-rejected{color:var(--fail);background:var(--fail-bg)}
+.c-held,.c-escalated{color:var(--held);background:var(--held-bg)}
+.c-dispatched,.c-claimed_done{color:var(--accent);background:rgba(111,127,240,.10)}
+.c-pending,.c-blocked{color:var(--t3);background:var(--e2)}
+.row .t{font-size:14px;font-weight:500;letter-spacing:-.008em}
+.row .why{font-family:var(--mono);font-size:11.5px;color:var(--t3);margin-top:4px;word-break:break-word}
+.row .who{font-family:var(--mono);font-size:11px;color:var(--t3);white-space:nowrap}
+.row .cost{font-family:var(--mono);font-size:11px;color:var(--t3);white-space:nowrap}
+.spec{font-family:var(--mono);font-size:9.5px;letter-spacing:.06em;color:var(--t3);
+  border:1px solid var(--line);border-radius:4px;padding:1px 4px;margin-left:7px;vertical-align:2px}
+
+.panel{padding:16px 17px}
+.kv{display:flex;justify-content:space-between;gap:12px;align-items:baseline;
+  padding:5px 0;font-size:13px;color:var(--t2)}
+.kv b{color:var(--t1);font-weight:500;font-family:var(--mono);font-variant-numeric:tabular-nums}
+.bar{height:6px;background:var(--e3);border-radius:9999px;overflow:hidden;margin:9px 0 6px}
+.bar i{display:block;height:100%;background:var(--accent);transition:width .5s}
+.note{color:var(--t3);font-size:11.5px;margin-top:7px}
+.cost-row b.pass{color:var(--pass)} .cost-row b.fail{color:var(--fail)}
+.cost-row.total{border-top:1px solid var(--line);margin-top:7px;padding-top:9px}
+.trust-row{padding:8px 0;border-top:1px solid var(--line)}
+.trust-row:first-child{border-top:0}
+.trust-head{display:flex;justify-content:space-between;align-items:center;gap:8px}
+.trust-head .who{font-size:13px;font-weight:500}
+.trust-head .who small{color:var(--t3);font-weight:400}
+.tpill{font-family:var(--mono);font-size:9.5px;letter-spacing:.05em;text-transform:uppercase;
+  padding:2px 7px;border-radius:9999px}
+.t-human{color:var(--t2);background:var(--e2)}
+.t-trusted{color:var(--pass);background:var(--pass-bg)}
+.t-probation{color:var(--held);background:var(--held-bg)}
+.trust-row .detail{font-family:var(--mono);font-size:10.5px;color:var(--t3);margin-top:4px}
+.log{padding:14px 16px;max-height:260px;overflow:auto}
+.log div{font-family:var(--mono);font-size:11px;color:var(--t3);padding:3px 0;
+  border-top:1px solid var(--line);word-break:break-word}
+.log div:first-child{border-top:0;color:var(--t2)}
+.compression{font-family:var(--mono);font-size:11px;color:var(--t3);letter-spacing:.02em}
+::-webkit-scrollbar{width:8px;height:8px}
+::-webkit-scrollbar-thumb{background:var(--e3);border-radius:9999px}
 </style>
 
-<header>
-  <h1>Conductor</h1>
-  <div class="headline" id="headline">Loading</div>
-  <div class="sub" id="sub"></div>
-  <div class="bar">
-    <button onclick="tick(1)">Advance one tick</button>
+<script>
+// Set the theme before first paint so there is no flash.
+(function(){try{var s=localStorage.getItem("conductor-theme");
+  var d=s?s==="dark":(window.matchMedia&&matchMedia("(prefers-color-scheme: dark)").matches);
+  if(d)document.documentElement.classList.add("dk");}catch(e){}})();
+</script>
+<div class="top">
+  <span class="brand">Conductor</span>
+  <div class="controls">
+    <span class="compression" id="compression"></span>
+    <button class="ghost icon" id="theme" onclick="toggleTheme()" aria-label="Toggle theme">◐</button>
+    <button class="ghost" onclick="tick(1)">Advance tick</button>
     <button onclick="tick(6)">Run six</button>
-    <span class="note" id="compression"></span>
   </div>
-</header>
+</div>
 
-<main>
-  <div>
-    <section>
-      <h2>Needs you</h2>
-      <div id="decisions"></div>
-    </section>
-    <section>
-      <h2>Board</h2>
-      <div class="card"><table id="board"></table></div>
-    </section>
+<div class="wrap">
+  <div class="hero">
+    <div class="headline"><span id="headline">Loading</span>
+      <span class="loop"><span class="dot"></span> Loop running</span></div>
+    <div class="figures" id="figures"></div>
   </div>
 
-  <div>
-    <section>
-      <h2>Attention</h2>
-      <div class="card" id="attention"></div>
-    </section>
-    <section>
-      <h2>Cost</h2>
-      <div class="card" id="cost"></div>
-    </section>
-    <section>
-      <h2>Trust</h2>
-      <div class="card" id="trust"></div>
-    </section>
-    <section>
-      <h2>Log</h2>
-      <div class="card log" id="log"></div>
-    </section>
-  </div>
-</main>
+  <main>
+    <div>
+      <section>
+        <div class="label">Needs you</div>
+        <div id="decisions"></div>
+      </section>
+      <section>
+        <div class="label">Board</div>
+        <div class="card" id="board"></div>
+      </section>
+    </div>
+
+    <div>
+      <section><div class="label">Attention</div><div class="card" id="attention"></div></section>
+      <section><div class="label">Cost</div><div class="card" id="cost"></div></section>
+      <section><div class="label">Trust</div><div class="card" id="trust"></div></section>
+      <section><div class="label">Log</div><div class="card log" id="log"></div></section>
+    </div>
+  </main>
+</div>
 
 <script>
 const $ = id => document.getElementById(id);
-const esc = s => String(s ?? "").replace(/[<>&]/g, c => ({"<":"&lt;",">":"&gt;","&":"&amp;"}[c]));
+const esc = s => String(s ?? "").replace(/[<>&"]/g, c => ({"<":"&lt;",">":"&gt;","&":"&amp;",'"':"&quot;"}[c]));
+const prev = {};
+
+function count(el, k, to, pre="", suf=""){
+  const from = prev[k] ?? to; prev[k] = to;
+  if (from === to){ el.textContent = pre+to+suf; return; }
+  const start = performance.now(), dur = 460;
+  const step = now => {
+    const p = Math.min(1, (now-start)/dur);
+    el.textContent = pre + Math.round(from + (to-from)*(1-Math.pow(1-p,3))) + suf;
+    if (p<1) requestAnimationFrame(step);
+  };
+  requestAnimationFrame(step);
+}
 
 function render(s){
   const n = s.decisions.length;
-  $("headline").textContent = n === 0 ? "Nothing needs you."
-    : n === 1 ? "One thing needs you." : `${n} things need you.`;
-  const m = s.metrics;
-  $("sub").textContent =
-    `${m.verified} verified · ${m.claims_rejected} claims rejected before you saw them · ${m.held} held for capacity`;
+  $("headline").textContent = n===0 ? "Nothing needs you."
+    : n===1 ? "One thing needs you." : n+" things need you.";
   $("compression").textContent = s.compression;
 
-  $("decisions").innerHTML = n === 0
-    ? `<div class="empty">The loop is running.<span>Verifying, recovering and dispatching. You will hear from it when there is a judgment call.</span></div>`
-    : s.decisions.map(d => `
-      <div class="q">
-        <h3>${esc(d.question)}</h3>
-        <div class="qmeta">
-          unblocks <b>${d.unblocks}</b> items${d.compressed_from > 1
-            ? ` · compressed from <b>${d.compressed_from}</b> escalations` : ""}
-          ${d.branches ? ` · <b>${d.prebuilt}</b> of ${d.branches} branches already built and verified · $${d.spent.toFixed(4)} spent` : ""}
-        </div>
+  // Each figure: [colour, key, integer-to-animate | null, prefix, suffix, static-text, label]
+  const m = s.metrics, c = s.cost, att = s.attention[0] || {spent:0,total:0};
+  const figs = n===0
+    ? [["ink","f0",m.verified,"","","","Verified this run"],
+       ["pass","f1",0,"","","","Things need you"],
+       ["held","f2",s.in_flight,"","","","In flight now"]]
+    : [["fail","f3",m.claims_rejected,"","","","Claims caught before you saw them"],
+       ["ink","f4",null,"","","$"+c.discarded.toFixed(2),"Spent building answers overnight"],
+       ["held","f5",att.spent,"","m","","Attention spent today"]];
+  $("figures").innerHTML = figs.map(([cls,k,,,,,l])=>
+    `<div class="fig ${cls}"><div class="n" id="${k}"></div><div class="l">${l}</div></div>`).join("");
+  figs.forEach(([,k,num,pre,suf,stat])=>{
+    const el = $(k);
+    if (num===null) el.textContent = stat;
+    else count(el, k, num, pre, suf);
+  });
+
+  $("decisions").innerHTML = n===0
+    ? `<div class="card decision empty"><div class="run">The loop is running.</div>
+       <div class="sub">Verifying, recovering and dispatching. You will hear from it when there is a judgment call.</div></div>`
+    : s.decisions.map(d=>`
+      <div class="card decision" style="margin-bottom:11px">
+        <div class="q">${esc(d.question)}</div>
+        <div class="meta">unblocks <b>${d.unblocks}</b> items${
+          d.compressed_from>1?` · compressed from <b>${d.compressed_from}</b> escalations`:""}${
+          d.branches?` · <b>${d.prebuilt}</b> of ${d.branches} branches already built · $${d.spent.toFixed(4)} spent`:""}</div>
         ${d.needs_framing
           ? `<div class="note">No options yet. This one needs framing before anyone can answer it, so nothing was speculated against it.</div>`
-          : `<div class="opts">${d.options.map(o =>
-              `<button onclick="answer('${d.id}', ${JSON.stringify(o).replace(/"/g,'&quot;')})">${esc(o)}</button>`).join("")}</div>`}
+          : `<div class="opts">${d.options.map(o=>
+              `<button onclick="answer('${d.id}','${esc(o)}')">${esc(o)}</button>`).join("")}</div>`}
       </div>`).join("");
 
-  $("board").innerHTML = s.board.map(c => `
-    <tr>
-      <td style="width:118px"><span class="pill ${c.status}">${c.status.replace("_"," ")}</span></td>
-      <td>
-        <div class="t">${esc(c.title)} ${c.speculative ? '<span class="spec">SPEC</span>' : ""}</div>
-        <div class="why">${esc(c.reason)}</div>
-      </td>
-      <td style="width:92px" class="mono spec">${esc(c.owner || "")}</td>
-      <td style="width:52px" class="mono spec num">${c.review_cost}m</td>
-    </tr>`).join("");
+  $("board").innerHTML = s.board.map(x=>`
+    <div class="row ${x.status==='rejected'?'fail':''}">
+      <span class="chip c-${x.status}">${x.status.replace('_',' ')}</span>
+      <div><span class="t">${esc(x.title)}</span>${x.speculative?'<span class="spec">SPEC</span>':''}
+        <div class="why">${esc(x.reason)}</div></div>
+      <span class="who">${esc(x.owner||'')}</span>
+      <span class="cost">${x.review_cost}m</span>
+    </div>`).join("");
 
-  $("attention").innerHTML = s.attention.map(a => {
-    const used = a.total ? Math.round((a.spent + a.committed) / a.total * 100) : 0;
-    return `<div class="kv"><span>${esc(a.reviewer)}</span><b>${a.remaining}m free</b></div>
-      <div class="meter"><i style="width:${used}%"></i></div>
-      <div class="note">${a.spent}m spent · ${a.committed}m in flight · ${a.total}m budget</div>`;
-  }).join("") || '<div class="note">no reviewers yet</div>';
+  $("attention").innerHTML = s.attention.map(a=>{
+    const used = a.total ? Math.round((a.spent+a.committed)/a.total*100) : 0;
+    return `<div class="panel"><div class="kv"><span>${esc(a.reviewer)}</span><b>${a.remaining}m free</b></div>
+      <div class="bar"><i style="width:${used}%"></i></div>
+      <div class="note">${a.spent}m spent · ${a.committed}m in flight · ${a.total}m budget</div></div>`;
+  }).join("") || '<div class="panel note">no reviewers yet</div>';
 
-  const c = s.cost;
-  $("cost").innerHTML = `
-    <div class="kv"><span>on work that passed</span><b style="color:var(--pass)">$${c.verified.toFixed(4)}</b></div>
-    <div class="kv"><span>on claims that failed</span><b style="color:var(--fail)">$${c.rejected.toFixed(4)}</b></div>
-    <div class="kv"><span>on discarded branches</span><b>$${c.discarded.toFixed(4)}</b></div>
-    <div class="kv" style="border-top:1px solid var(--grid);margin-top:6px;padding-top:9px">
-      <span>per verified item</span><b>$${c.per_verified.toFixed(4)}</b></div>
-    <div class="note" style="margin-top:8px">failed claims were never reviewed by a person</div>`;
+  $("cost").innerHTML = `<div class="panel">
+    <div class="kv cost-row"><span>on work that passed</span><b class="pass">$${c.verified.toFixed(4)}</b></div>
+    <div class="kv cost-row"><span>on claims that failed</span><b class="fail">$${c.rejected.toFixed(4)}</b></div>
+    <div class="kv cost-row"><span>on discarded branches</span><b>$${c.discarded.toFixed(4)}</b></div>
+    <div class="kv cost-row total"><span>per verified item</span><b>$${c.per_verified.toFixed(4)}</b></div>
+    <div class="note">failed claims were never reviewed by a person</div></div>`;
 
-  $("trust").innerHTML = s.trust.map(t => `
-    <div class="kv"><span>${esc(t.worker)}${t.principal ? ` <span class="note">for ${esc(t.principal)}</span>` : ""}</span>
-      <span class="pill ${t.probation && t.type === "agent" ? "held" : "done"}">${
-        t.type === "agent" ? (t.probation ? "probation" : "trusted") : "human"}</span></div>
-    <div class="note mono">${esc(t.detail)}</div>`).join("");
+  $("trust").innerHTML = `<div class="panel">${s.trust.map(t=>{
+    const cls = t.type!=='agent' ? 't-human' : (t.probation ? 't-probation' : 't-trusted');
+    const lab = t.type!=='agent' ? 'human' : (t.probation ? 'probation' : 'trusted');
+    const detail = t.detail && !t.detail.includes('no history') ? `<div class="detail">${esc(t.detail)}</div>` : '';
+    return `<div class="trust-row"><div class="trust-head">
+      <span class="who">${esc(t.worker)}${t.principal?` <small>for ${esc(t.principal)}</small>`:''}</span>
+      <span class="tpill ${cls}">${lab}</span></div>${detail}</div>`;
+  }).join("")}</div>`;
 
-  $("log").innerHTML = s.events.map(e => `<div>${esc(e)}</div>`).join("");
+  $("log").innerHTML = s.events.map(e=>`<div>${esc(e)}</div>`).join("");
 }
 
-async function load(){ render(await (await fetch("/api/state")).json()); }
+async function load(){ try{ render(await (await fetch("/api/state")).json()); }catch(e){} }
 async function post(path, body){
-  render(await (await fetch(path, {method:"POST", headers:{"Content-Type":"application/json"},
-    body: JSON.stringify(body)})).json());
+  render(await (await fetch(path,{method:"POST",headers:{"Content-Type":"application/json"},
+    body:JSON.stringify(body)})).json());
 }
-const answer = (id, choice) => post("/api/answer", {decision_id:id, choice});
-const tick = ticks => post("/api/tick", {ticks});
+const answer = (id,choice)=>post("/api/answer",{decision_id:id,choice});
+const tick = ticks=>post("/api/tick",{ticks});
+
+// Theme: dark is native. Respect a saved choice, else the OS, and let the
+// toggle override. localStorage may throw in some embeds, so guard it.
+function applyTheme(dark){
+  document.documentElement.classList.toggle("dk", dark);
+  const t = $("theme"); if (t) t.textContent = dark ? "◑" : "◐";
+}
+function toggleTheme(){
+  const dark = !document.documentElement.classList.contains("dk");
+  applyTheme(dark);
+  try{ localStorage.setItem("conductor-theme", dark?"dark":"light"); }catch(e){}
+}
+// The head script already set the class before paint; just sync the icon.
+applyTheme(document.documentElement.classList.contains("dk"));
+
 load(); setInterval(load, 4000);
 </script>
