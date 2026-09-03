@@ -90,13 +90,14 @@ class StrandsWorker:
     failure this whole system exists to catch.
     """
 
-    def __init__(self, resource, workdir: str, tools: list | None = None,
-                 ledger=None):
+    def __init__(self, resource, workdir: str = ".", tools: list | None = None,
+                 ledger=None, executor=None):
         self.id = resource.id
         self.ledger = ledger
         self.resource = resource
         self.workdir = workdir
         self.extra_tools = tools or []
+        self.executor = executor   # when set, open a real worktree per dispatch
         self._agent = None
 
     def _build(self):
@@ -104,13 +105,13 @@ class StrandsWorker:
 
         from .agents.base import model
 
-        workdir = self.workdir
+        worker = self  # tools resolve the CURRENT worktree, not a fixed one
 
         @tool
         def write_artifact(path: str, content: str) -> str:
             """Write your output to a file inside the working directory."""
-            full = os.path.join(workdir, path)
-            os.makedirs(os.path.dirname(full) or workdir, exist_ok=True)
+            full = os.path.join(worker.workdir, path)
+            os.makedirs(os.path.dirname(full) or worker.workdir, exist_ok=True)
             with open(full, "w") as f:
                 f.write(content)
             return f"wrote {len(content)} bytes to {path}"
@@ -118,7 +119,7 @@ class StrandsWorker:
         @tool
         def read_artifact(path: str) -> str:
             """Read a file inside the working directory."""
-            full = os.path.join(workdir, path)
+            full = os.path.join(worker.workdir, path)
             if not os.path.exists(full):
                 return f"{path} does not exist"
             with open(full) as f:
@@ -147,6 +148,9 @@ class StrandsWorker:
         )
 
     def dispatch(self, cm, context: str = "") -> None:
+        if self.executor is not None and cm.branch:
+            # Real isolation: the agent writes into this commitment's worktree.
+            self.workdir = self.executor.open(cm.branch)
         if self._agent is None:
             self._agent = self._build()
         cm.attempts += 1

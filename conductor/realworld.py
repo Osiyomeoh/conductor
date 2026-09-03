@@ -95,7 +95,7 @@ class CodeWorker:
                + (" (confident, wrong)" if use_bad else ""))
 
 
-def build(repo_path: str) -> Conductor:
+def build(repo_path: str, live: bool = False) -> Conductor:
     repo = init_repo(repo_path)
     gx = GitExecutor(repo)
 
@@ -108,6 +108,7 @@ def build(repo_path: str) -> Conductor:
             t["title"], Evidence(EvidenceKind.COMMAND, spec=t["check"]),
             work_kind=t["kind"], review_cost_minutes=t["cost"])
         cm.task_key = key
+        cm.artifact_path = t["file"]
         cm.branch = f"conductor/{cm.id}"
         g.add(cm)
 
@@ -123,9 +124,22 @@ def build(repo_path: str) -> Conductor:
     trust, cost = TrustLedger(), CostLedger()
     disp = Dispatcher(graph=g, policy=PolicyEngine(autonomy=0.6), trust=trust)
     disp.budgets["human_sam"] = AttentionBudget("human_sam", minutes_per_day=90)
-    # slugify and backoff come back wrong the first time; the check catches both.
-    disp.workers = {"agent_impl": CodeWorker("agent_impl", gx,
-                                             buggy_first={"slugify", "retry_backoff"})}
+    if live:
+        # A real Strands agent (provider from CONDUCTOR_PROVIDER) writing real
+        # code into real worktrees. Whether it is correct is decided by the
+        # evidence, exactly as with the deterministic worker.
+        from .roster import AgentSpec
+        from .workers import StrandsWorker
+        g.resources["agent_impl"].spec = AgentSpec(
+            purpose="Write small, correct Python. You are given the exact check "
+                    "that will run against your file; satisfy it precisely.",
+            work_kinds=["code"])
+        disp.workers = {"agent_impl": StrandsWorker(
+            g.resources["agent_impl"], executor=gx, ledger=cost)}
+    else:
+        # slugify and backoff come back wrong first; the check catches both.
+        disp.workers = {"agent_impl": CodeWorker("agent_impl", gx,
+                                                 buggy_first={"slugify", "retry_backoff"})}
 
     return Conductor(
         graph=g, verifier=VerificationRunner(workdir=repo), dispatcher=disp,
