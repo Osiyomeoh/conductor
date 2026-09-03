@@ -10,8 +10,10 @@ Built with the **[Strands Agents SDK](https://strandsagents.com)** on Amazon
 Bedrock (with a Gemini provider path), and deployable to Amazon Bedrock
 AgentCore Runtime.
 
-**Track:** Professional Agents. **Live demo:** run `python serve.py` and open
-`http://127.0.0.1:7616` (see *Running it*).
+**Track:** Professional Agents.
+**Live app:** https://pe6euudszs.us-west-2.awsapprunner.com (deployed on AWS App Runner).
+**Deployed agent:** Amazon Bedrock AgentCore Runtime — `arn:aws:bedrock-agentcore:us-west-2:287977321648:runtime/conductor-Vcnj7IB5nX` (see [docs/submission/agentcore-proof.md](docs/submission/agentcore-proof.md)).
+Or run it locally: `python serve.py` and open `http://127.0.0.1:7616` (see *Running it*).
 
 ---
 
