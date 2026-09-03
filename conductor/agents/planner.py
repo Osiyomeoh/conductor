@@ -102,7 +102,11 @@ class PlannerAgent:
                            description="Turns intent into commitments that carry their own proof")
 
     def plan(self, intent: str) -> SprintPlan:
-        return self.agent.structured_output(SprintPlan, intent)
+        from ..resilience import with_retry
+        from ..config import CONFIG
+        return with_retry(lambda: self.agent.structured_output(SprintPlan, intent),
+                          max_retries=CONFIG.max_retries, base=CONFIG.backoff_base,
+                          cap=CONFIG.backoff_cap)
 
     def to_commitments(self, plan: SprintPlan) -> tuple[list[Commitment], list[str]]:
         made, rejected = materialise(plan)

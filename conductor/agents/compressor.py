@@ -49,4 +49,8 @@ class CompressorAgent:
         lines = "\n".join(
             f"- id={e['id']} | {e['question']} | blocks {e.get('blocks', 0)} items"
             for e in escalations)
-        return self.agent.structured_output(Compression, f"Escalations:\n{lines}")
+        from ..resilience import with_retry
+        from ..config import CONFIG
+        return with_retry(
+            lambda: self.agent.structured_output(Compression, f"Escalations:\n{lines}"),
+            max_retries=CONFIG.max_retries, base=CONFIG.backoff_base, cap=CONFIG.backoff_cap)

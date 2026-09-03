@@ -47,8 +47,13 @@ class RecoveryAgent:
 
     def diagnose(self, title: str, evidence_spec: str, detail: str,
                  attempts: int, worker: str, trust: float) -> Diagnosis:
-        return self.agent.structured_output(Diagnosis, f"""Task: {title}
+        from ..resilience import with_retry
+        from ..config import CONFIG
+        prompt = f"""Task: {title}
 Evidence check: {evidence_spec}
 Failure detail: {detail}
 Attempt: {attempts}
-Worker: {worker} (trust on this kind of work: {trust:.0%})""")
+Worker: {worker} (trust on this kind of work: {trust:.0%})"""
+        return with_retry(lambda: self.agent.structured_output(Diagnosis, prompt),
+                          max_retries=CONFIG.max_retries, base=CONFIG.backoff_base,
+                          cap=CONFIG.backoff_cap)

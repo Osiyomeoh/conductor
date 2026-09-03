@@ -493,3 +493,68 @@ def test_real_repo_run_merges_only_verified_code(tmp_path):
     # No conductor worktree branches survive.
     branches = subprocess.run(["git", "-C", repo, "branch"], capture_output=True, text=True).stdout
     assert "conductor/" not in branches
+
+
+# --- production hardening ---------------------------------------------------
+
+def test_retry_absorbs_transient_faults_but_not_real_errors():
+    from conductor.resilience import with_retry, is_retryable
+    assert is_retryable(RuntimeError("429 Too Many Requests"))
+    assert is_retryable(Exception("event loop cycle failed"))
+    assert not is_retryable(ValueError("bad input"))
+
+    calls = [0]
+    def flaky():
+        calls[0] += 1
+        if calls[0] < 3:
+            raise RuntimeError("503 unavailable")
+        return "ok"
+    assert with_retry(flaky, max_retries=5, base=1.001, cap=0.01) == "ok"
+    assert calls[0] == 3
+
+    import pytest
+    with pytest.raises(ValueError):
+        with_retry(lambda: (_ for _ in ()).throw(ValueError("nope")),
+                   max_retries=3, base=1.001)
+
+
+def test_server_health_and_input_validation():
+    import json, threading, time, urllib.request, urllib.error
+    from conductor.server import serve
+    c = build(); c.run(ticks=2)
+    port = 7691
+    threading.Thread(target=serve, args=(c,),
+                     kwargs={"port": port, "open_browser": False}, daemon=True).start()
+    time.sleep(0.5)
+    base = f"http://127.0.0.1:{port}"
+
+    h = json.load(urllib.request.urlopen(base + "/api/health"))
+    assert h["status"] == "ok" and "commitments" in h
+
+    def post(path, data):
+        req = urllib.request.Request(base + path, data=data, method="POST",
+                                     headers={"Content-Type": "application/json"})
+        try:
+            return urllib.request.urlopen(req).status
+        except urllib.error.HTTPError as e:
+            return e.code
+
+    assert post("/api/tick", b"not json") == 400
+    assert post("/api/answer", b"{}") == 400
+    assert post("/api/answer", b'{"decision_id":"nope","choice":"x"}') in (404, 500)
+
+
+def test_config_selects_store_from_environment(tmp_path, monkeypatch):
+    from conductor.events import JsonlStore, MemoryStore
+    import importlib, conductor.config as cfg
+
+    monkeypatch.delenv("CONDUCTOR_TABLE", raising=False)
+    monkeypatch.delenv("CONDUCTOR_EVENT_LOG", raising=False)
+    importlib.reload(cfg)
+    assert isinstance(cfg.Config().store(), MemoryStore)
+
+    monkeypatch.setenv("CONDUCTOR_EVENT_LOG", str(tmp_path / "e.jsonl"))
+    importlib.reload(cfg)
+    assert isinstance(cfg.Config().store(), JsonlStore)
+    monkeypatch.delenv("CONDUCTOR_EVENT_LOG", raising=False)
+    importlib.reload(cfg)

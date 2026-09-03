@@ -12,9 +12,15 @@ from __future__ import annotations
 import json
 import os
 import threading
+import logging
+
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
+from .config import CONFIG
+
 from .models import Status
+
+log = logging.getLogger("conductor.server")
 
 UI_DIR = os.path.join(os.path.dirname(__file__), "ui")
 UI = os.path.join(UI_DIR, "index.html")
@@ -191,7 +197,22 @@ def serve(conductor, port: int = 7616, open_browser: bool = True):
             self.wfile.write(b)
 
         def do_GET(self):
-            if self.path.startswith("/api/team"):
+            try:
+                self._route_get()
+            except BrokenPipeError:
+                pass
+            except Exception as e:  # noqa: BLE001
+                log.exception("GET %s failed", self.path)
+                self._send(500, json.dumps({"error": "internal error",
+                                            "detail": str(e)[:200]}))
+
+        def _route_get(self):
+            if self.path.startswith("/api/health"):
+                self._send(200, json.dumps({"status": "ok",
+                    "provider": CONFIG.provider,
+                    "commitments": len(conductor.graph.commitments),
+                    "open_decisions": len(conductor.surface.open)}))
+            elif self.path.startswith("/api/team"):
                 with lock:
                     self._send(200, json.dumps(team(conductor)))
             elif self.path.startswith("/api/plan"):
@@ -226,25 +247,47 @@ def serve(conductor, port: int = 7616, open_browser: bool = True):
                 self._send(404, json.dumps({"error": "not found"}))
 
         def do_POST(self):
-            n = int(self.headers.get("Content-Length", 0))
-            payload = json.loads(self.rfile.read(n) or b"{}")
-            with lock:
-                if self.path.startswith("/api/answer"):
-                    conductor.answer(payload["decision_id"], payload["choice"])
-                    conductor.run(ticks=4)
-                elif self.path.startswith("/api/tick"):
-                    conductor.run(ticks=int(payload.get("ticks", 1)))
-                else:
-                    return self._send(404, json.dumps({"error": "not found"}))
-                self._send(200, json.dumps(state(conductor)))
+            try:
+                n = int(self.headers.get("Content-Length", 0) or 0)
+                if n > 1_000_000:
+                    return self._send(413, json.dumps({"error": "payload too large"}))
+                payload = json.loads(self.rfile.read(n) or b"{}")
+            except (ValueError, json.JSONDecodeError):
+                return self._send(400, json.dumps({"error": "invalid JSON"}))
+            try:
+                with lock:
+                    if self.path.startswith("/api/answer"):
+                        if "decision_id" not in payload or "choice" not in payload:
+                            return self._send(400, json.dumps(
+                                {"error": "decision_id and choice required"}))
+                        conductor.answer(payload["decision_id"], payload["choice"])
+                        conductor.run(ticks=4)
+                    elif self.path.startswith("/api/tick"):
+                        conductor.run(ticks=max(1, min(20, int(payload.get("ticks", 1)))))
+                    else:
+                        return self._send(404, json.dumps({"error": "not found"}))
+                    self._send(200, json.dumps(state(conductor)))
+            except KeyError as e:
+                self._send(404, json.dumps({"error": f"unknown id: {e}"}))
+            except BrokenPipeError:
+                pass
+            except Exception as e:  # noqa: BLE001
+                log.exception("POST %s failed", self.path)
+                self._send(500, json.dumps({"error": "internal error",
+                                            "detail": str(e)[:200]}))
 
-    srv = ThreadingHTTPServer(("127.0.0.1", port), Handler)
-    url = f"http://127.0.0.1:{port}"
-    print(f"decision surface: {url}")
+    host, port = CONFIG.host, port or CONFIG.port
+    srv = ThreadingHTTPServer((host, port), Handler)
+    url = f"http://{host}:{port}"
+    log.info("conductor serving at %s (provider=%s)", url, CONFIG.provider)
+    print(f"conductor: {url}")
     if open_browser:
         try:
             import webbrowser
             webbrowser.open(url)
         except Exception:
             pass
-    srv.serve_forever()
+    try:
+        srv.serve_forever()
+    except KeyboardInterrupt:
+        srv.shutdown()

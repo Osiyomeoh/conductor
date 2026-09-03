@@ -164,7 +164,11 @@ class StrandsWorker:
                  f"The check that will be run afterwards: {cm.evidence.spec}\n"
                  f"{('Previous attempt failed: ' + context) if context else ''}")
         try:
-            result = self._agent(order)
+            from .resilience import with_retry
+            from .config import CONFIG
+            result = with_retry(lambda: self._agent(order),
+                                max_retries=CONFIG.max_retries,
+                                base=CONFIG.backoff_base, cap=CONFIG.backoff_cap)
             # Real measured usage, not an estimate.
             if self.ledger is not None:
                 u = getattr(getattr(result, "metrics", None), "accumulated_usage", {}) or {}
