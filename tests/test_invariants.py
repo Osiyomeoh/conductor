@@ -354,3 +354,29 @@ def test_judgment_calls_are_marked_not_assigned():
     assert decisions, "expected at least one judgment call in the plan"
     for d in decisions:
         assert d["options"] or d["proof_kind"] == "review"
+
+
+# --- team -------------------------------------------------------------------
+
+def test_team_interleaves_humans_and_agents_with_delegation():
+    """The team screen's claim: an agent is a colleague with a record, and a
+    delegate carries its principal, not its own authority."""
+    from conductor.server import team
+    c = build()
+    c.run(ticks=3)
+    t = team(c)
+    ids = {m["id"]: m for m in t["members"]}
+    assert ids["human_sam"]["type"] == "human"
+    assert ids["agent_impl"]["type"] == "agent"
+    # The delegate acts for a person and starts on probation like any agent.
+    d = ids["agent_delegate"]
+    assert d["principal"] == "human_sam"
+    assert d["probation"] is True
+
+
+def test_hiring_proposals_are_only_for_non_judgment_work():
+    from conductor.server import team
+    c = build()
+    c.run(ticks=4)
+    for p in team(c)["proposals"]:
+        assert p["kind"] not in ("product", "design")   # judgment kinds

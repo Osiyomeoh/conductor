@@ -222,6 +222,39 @@ section{margin-bottom:30px}
 .plan-foot{display:flex;justify-content:space-between;align-items:center;gap:16px;margin-top:26px}
 .plan-foot .approve{background:var(--accent);border-color:var(--accent);color:#fff;padding:11px 20px}
 .plan-foot .approve:hover{filter:brightness(1.08)}
+
+/* team */
+.hire{border:1px solid var(--held);border-radius:12px;padding:18px;
+  background:var(--held-bg);margin-bottom:24px}
+.hire .htag{font-family:var(--mono);font-size:10px;letter-spacing:.1em;text-transform:uppercase;
+  color:var(--held);margin-bottom:9px}
+.hire .hq{font-size:16px;font-weight:600;letter-spacing:-.01em;line-height:1.35}
+.hire .hopts{display:flex;flex-wrap:wrap;gap:8px;margin-top:14px}
+.hire .hopts button{border-color:var(--line-strong)}
+.roster{border:1px solid var(--line);border-radius:12px;overflow:hidden}
+.mrow{display:grid;grid-template-columns:1fr auto auto;gap:16px;align-items:center;
+  padding:15px 16px;border-top:1px solid var(--line)}
+.mrow:first-child{border-top:0}
+.mrow.delegate{padding-left:30px;background:var(--e1)}
+.mrow .mn{font-size:14px;font-weight:600;letter-spacing:-.008em;display:flex;align-items:center;gap:8px}
+.mrow .mp{color:var(--t2);font-size:12px;margin-top:3px}
+.mrow .mp .princ{color:var(--t3)}
+.kind{font-family:var(--mono);font-size:9.5px;letter-spacing:.05em;text-transform:uppercase;
+  padding:2px 8px;border-radius:9999px;background:var(--e2);color:var(--t2)}
+.kind.agent{color:var(--accent);background:rgba(111,127,240,.10)}
+.skills{display:flex;gap:12px;flex-wrap:wrap;justify-content:flex-end;max-width:280px}
+.skill{font-family:var(--mono);font-size:11px;color:var(--t2);text-align:right}
+.skill .sk{color:var(--t3)}
+.skill .none{color:var(--t3)}
+.status-pill{font-family:var(--mono);font-size:9.5px;letter-spacing:.05em;text-transform:uppercase;
+  padding:3px 10px;border-radius:9999px;white-space:nowrap}
+.status-pill.trusted{color:var(--pass);background:var(--pass-bg)}
+.status-pill.probation{color:var(--held);background:var(--held-bg)}
+.status-pill.human{color:var(--t2);background:var(--e2)}
+.prob-note{margin-top:22px;border-top:1px solid var(--line);padding-top:16px}
+.prob-note .h{font-family:var(--mono);font-size:11px;letter-spacing:.1em;text-transform:uppercase;
+  color:var(--t3);margin-bottom:8px}
+.prob-note p{color:var(--t2);font-size:13px;line-height:1.5;margin:0}
 ::-webkit-scrollbar{width:8px;height:8px}
 ::-webkit-scrollbar-thumb{background:var(--e3);border-radius:9999px}
 </style>
@@ -238,6 +271,7 @@ section{margin-bottom:30px}
     <span class="compression" id="compression"></span>
     <button class="ghost icon" id="theme" onclick="toggleTheme()" aria-label="Toggle theme">◐</button>
     <button class="ghost" onclick="openPlan()">Plan a sprint</button>
+    <button class="ghost" onclick="openTeam()">Team</button>
     <button class="ghost" onclick="tick(1)">Advance tick</button>
     <button onclick="tick(6)">Run six</button>
   </div>
@@ -474,6 +508,43 @@ async function openPlan(){
   document.body.style.overflow = "hidden";
 }
 
+// --- team: humans and agents as one roster ---------------------------------
+async function openTeam(){
+  const t = await (await fetch("/api/team")).json();
+  const skillHtml = m => m.skills.map(s=>
+    s.score===null ? `<div class="skill"><span class="sk">${esc(s.kind)}</span> <span class="none">—</span></div>`
+    : `<div class="skill"><span class="sk">${esc(s.kind)}</span> ${Math.round(s.score*100)}% <span class="none">(${s.passes}/${s.total})</span></div>`
+  ).join("");
+  const statusPill = m => m.type!=="agent"
+    ? `<span class="status-pill human">human</span>`
+    : m.probation ? `<span class="status-pill probation">probation</span>`
+    : `<span class="status-pill trusted">trusted</span>`;
+  const rows = t.members.map(m=>`
+    <div class="mrow ${m.principal?'delegate':''}">
+      <div><div class="mn">${esc(m.name)} <span class="kind ${m.type}">${m.type}</span></div>
+        <div class="mp">${esc(m.purpose)}${m.principal
+          ? ` · <span class="princ">acts for ${esc(m.principal.replace('human_',''))}, inherits their scopes, reviewed by them</span>`
+          : m.budget?` · ${m.budget}m review budget`:''}</div></div>
+      <div class="skills">${skillHtml(m)}</div>
+      ${statusPill(m)}
+    </div>`).join("");
+  const hire = t.proposals.map(p=>`
+    <div class="hire"><div class="htag">Hiring proposal</div>
+      <div class="hq">${esc(p.question)}</div>
+      <div class="hopts">${p.options.map(o=>`<button>${esc(o)}</button>`).join("")}</div>
+    </div>`).join("");
+
+  $("sheet").innerHTML = `
+    <button class="ghost icon close" onclick="closeDecision()" aria-label="Close">✕</button>
+    <div class="d-q" style="font-size:26px;margin-bottom:20px">Team</div>
+    ${hire}
+    <div class="roster">${rows}</div>
+    <div class="prob-note"><div class="h">Probation</div>
+      <p>New teammates start with no trust. Everything they claim is deeply verified until they earn a lighter check. Graduation is on evidence, not time served.</p></div>`;
+  $("overlay").hidden = false;
+  document.body.style.overflow = "hidden";
+}
+
 document.addEventListener("keydown", e=>{ if(e.key==="Escape") closeDecision(); });
 
 // Theme: dark is native. Respect a saved choice, else the OS, and let the
@@ -498,6 +569,7 @@ async function bootScreen(){
   if (q.get("theme")==="light") applyTheme(false);
   const open = q.get("open");
   if (open==="plan") openPlan();
+  else if (open==="team") openTeam();
   else if (open==="decision"){
     const s = await (await fetch("/api/state")).json();
     const d = s.decisions.find(d=>d.branches) || s.decisions[0];

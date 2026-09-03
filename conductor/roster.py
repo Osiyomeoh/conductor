@@ -91,8 +91,9 @@ class Roster:
         """A hiring request, phrased as a decision for a human. Adding a
         teammate is consequential, so it is never automatic."""
         return {
-            "question": f"{count} items are queued on '{kind}' and nobody on the "
-                        f"team is reliable at it. Add an agent for it?",
+            "question": f"{count} item{'s' if count != 1 else ''} queued on "
+                        f"'{kind}' and nobody on the team is reliable at it. "
+                        f"Add an agent for it?",
             "options": [f"hire a {kind} agent", "reassign to a human",
                         "leave it queued"],
             "uncertainty_key": f"headcount:{kind}",

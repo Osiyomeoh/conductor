@@ -39,10 +39,18 @@ def build(seed: int = 7, store=None, tenant: str = "default") -> Conductor:
 
     recorder = Recorder(store, tenant)
     g = CommitmentGraph(recorder=recorder)
-    g.add_resource(Resource("human_sam", ResourceType.HUMAN, "Sam", ["product", "judgment"]))
-    g.add_resource(Resource("human_sarah", ResourceType.HUMAN, "Sarah", ["design"]))
-    g.add_resource(Resource("agent_impl", ResourceType.AGENT, "impl-agent", ["code"]))
-    g.add_resource(Resource("agent_research", ResourceType.AGENT, "research-agent", ["research"]))
+    g.add_resource(Resource("human_sam", ResourceType.HUMAN, "Sam", ["product", "judgment"],
+                            scopes=["repo:read", "repo:write:branch", "docs:write"]))
+    g.add_resource(Resource("human_sarah", ResourceType.HUMAN, "Sarah", ["design"],
+                            scopes=["repo:read", "design:write"]))
+    g.add_resource(Resource("agent_impl", ResourceType.AGENT, "impl-agent", ["code"],
+                            scopes=["repo:read", "repo:write:branch"]))
+    g.add_resource(Resource("agent_research", ResourceType.AGENT, "research-agent", ["research"],
+                            scopes=["repo:read"]))
+    # An agent that acts for a person: inherits Sam's scopes, reviewed by Sam.
+    g.add_resource(Resource("agent_delegate", ResourceType.AGENT, "sam's delegate",
+                            ["review-prep"], principal="human_sam",
+                            scopes=["repo:read", "repo:write:branch", "docs:write"]))
 
     webhook = _cm("Fix the payment webhook retry", "RETRY_OK", "code",
                   artifact="webhook.txt", review_cost_minutes=20)

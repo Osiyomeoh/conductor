@@ -83,6 +83,52 @@ def state(c) -> dict:
     }
 
 
+def team(c) -> dict:
+    """The roster: humans and agents as one team, plus any hiring the graph
+    currently justifies. An agent is a colleague with a record, not a
+    configured integration."""
+    from .roster import Roster
+    g = c.graph
+    roster = Roster(graph=g, trust=c.trust)
+
+    members = []
+    for r in g.resources.values():
+        agent = r.type.value == "agent"
+        skills = []
+        for k in (r.skills or ["general"]):
+            rec = c.trust.records.get((r.id, k))
+            if rec:
+                skills.append({"kind": k, "score": round(rec.score, 2),
+                               "passes": rec.passes, "total": rec.passes + rec.failures})
+            else:
+                skills.append({"kind": k, "score": None, "passes": 0, "total": 0})
+        purpose = {
+            "human_sam": "Product judgment and review",
+            "human_sarah": "Design",
+            "agent_impl": "Writes and fixes application code",
+            "agent_research": "Competitive and technical research",
+            "agent_delegate": "Handles Sam's review prep: diffs, drafts, follow-ups",
+        }.get(r.id, "General work")
+        budget = c.dispatcher.budgets.get(r.id)
+        members.append({
+            "id": r.id, "name": r.name, "type": r.type.value,
+            "purpose": purpose, "skills": skills,
+            "probation": getattr(r, "probation", False) if agent else False,
+            "principal": r.principal, "scopes": r.scopes,
+            "budget": budget.minutes_per_day if budget else None,
+        })
+    # Humans first, then agents; delegates sit under their principal.
+    members.sort(key=lambda m: (m["type"] == "agent", m["principal"] or "", m["id"]))
+
+    proposals = []
+    for kind, n in roster.bottlenecks(min_waiting=1):
+        p = roster.propose_hire(kind, n)
+        proposals.append({"kind": kind, "queued": n, "question": p["question"],
+                          "options": p["options"]})
+
+    return {"members": members, "proposals": proposals}
+
+
 def decision_detail(c, decision_id: str) -> dict:
     """Everything behind one question: the branches built while it waited, the
     work verified inside each, and the escalations it was compressed from.
@@ -143,7 +189,10 @@ def serve(conductor, port: int = 7616, open_browser: bool = True):
             self.wfile.write(b)
 
         def do_GET(self):
-            if self.path.startswith("/api/plan"):
+            if self.path.startswith("/api/team"):
+                with lock:
+                    self._send(200, json.dumps(team(conductor)))
+            elif self.path.startswith("/api/plan"):
                 from .planning import propose
                 with lock:
                     self._send(200, json.dumps(propose()))
