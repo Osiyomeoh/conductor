@@ -85,4 +85,8 @@ class DecisionSurface:
     def compression_ratio(self) -> str:
         raised = sum(len(d.merged_from) + 1 for d in list(self.open.values()) + self.answered)
         asked = len(self.open) + len(self.answered)
-        return f"{raised} escalations compressed to {asked} questions" if asked else "no escalations"
+        if not asked:
+            return "no escalations"
+        e = "escalation" if raised == 1 else "escalations"
+        q = "question" if asked == 1 else "questions"
+        return f"{raised} {e} compressed to {asked} {q}"

@@ -40,9 +40,12 @@ class Dispatcher:
 
         # Deeper distrust means a costlier review. Trust is priced, not assumed.
         depth = self.trust.evidence_depth(worker.id, cm.work_kind)
-        cm.review_cost_minutes = {"light": max(2, cm.review_cost_minutes // 3),
-                                  "standard": cm.review_cost_minutes,
-                                  "deep": cm.review_cost_minutes * 2}[depth]
+        if cm.base_review_cost is None:
+            cm.base_review_cost = cm.review_cost_minutes
+        base = cm.base_review_cost
+        cm.review_cost_minutes = {"light": max(2, base // 3),
+                                  "standard": base,
+                                  "deep": base * 2}[depth]
 
         if not budget.can_absorb(cm):
             budget.hold(cm)

@@ -124,6 +124,9 @@ class Commitment:
     status: Status = Status.PENDING
     # Minutes of human attention this will cost to review once claimed.
     review_cost_minutes: int = 10
+    # The planner's estimate. Trust scales the effective cost from THIS, never
+    # from the last value, or repeated deep checks compound: 40 -> 80 -> 640.
+    base_review_cost: int | None = None
     consequential: bool = False          # touches users, money, or prod
     ambiguous: bool = False              # needs judgment, not execution
     attempts: int = 0

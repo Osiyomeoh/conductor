@@ -305,3 +305,28 @@ def test_sequence_continues_across_restarts(tmp_path):
     r2 = Recorder(JsonlStore(path))
     e = r2.record(EventKind.DISPATCHED, commitment_id="x")
     assert e.seq == 4
+
+
+def test_review_cost_does_not_compound_across_retries():
+    """Regression: the trust multiplier scaled the LAST value rather than the
+    planner's estimate, so a repeatedly deep-verified item went 40 -> 80 -> 640
+    and starved the reviewer's budget on its own."""
+    from conductor.dispatcher import Dispatcher
+    from conductor.policy import PolicyEngine
+
+    g = CommitmentGraph()
+    g.add_resource(Resource("a1", ResourceType.AGENT, "a", skills=["code"]))
+    g.add_resource(Resource("h1", ResourceType.HUMAN, "h"))
+    t = TrustLedger()
+    for _ in range(3):
+        t.record("a1", "code", False)          # force deep checks
+    d = Dispatcher(graph=g, policy=PolicyEngine(), trust=t)
+    c = cm(review_cost_minutes=40)
+    c.work_kind = "code"
+    g.add(c)
+    seen = []
+    for _ in range(4):
+        c.status = Status.PENDING
+        d.dispatch(c)
+        seen.append(c.review_cost_minutes)
+    assert set(seen) == {80}, seen

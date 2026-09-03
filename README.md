@@ -106,6 +106,16 @@ python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
 .venv/bin/python -m pytest tests/ -q
 ```
 
+The decision surface, which is the only part a person looks at:
+
+```bash
+.venv/bin/python serve.py            # http://127.0.0.1:7616
+```
+
+It shows what needs you, what is held and why, what each question unblocks and
+how many branches were already built against it, where the attention budget
+went, and what the run cost. On a good day it says "Nothing needs you."
+
 For the Strands agents you need AWS credentials and Anthropic models enabled in
 Bedrock:
 
