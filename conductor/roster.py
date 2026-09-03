@@ -77,7 +77,8 @@ class Roster:
         waiting = Counter(
             cm.work_kind for cm in self.graph
             if cm.status in (Status.PENDING, Status.HELD, Status.REJECTED)
-            and not cm.ambiguous and not cm.consequential)
+            and not cm.ambiguous and not cm.consequential
+            and not cm.speculative_for)
         out = []
         for kind, n in waiting.items():
             capable = [r for r in self.graph.resources.values() if kind in r.skills]
