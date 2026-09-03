@@ -80,7 +80,7 @@ export function Onboarding({ go }: { go: (path: string) => void }) {
               <div className="pf held"><b>1</b><span>held</span></div>
             </div>
             <div className="prow"><span className="pchip pc-done">done</span><div><div className="pt">Fix the payment webhook retry</div><div className="pw">grep -q RETRY_OK webhook.txt · passed</div></div></div>
-            <div className="prow"><span className="pchip pc-fail">rejected</span><div><div className="pt">Implement slugify(text)</div><div className="pw">not lowercased — caught, re-dispatched</div></div></div>
+            <div className="prow"><span className="pchip pc-fail">rejected</span><div><div className="pt">Implement slugify(text)</div><div className="pw">not lowercased, caught, re-dispatched</div></div></div>
             <div className="prow"><span className="pchip pc-held">held</span><div><div className="pt">Migrate the onboarding events table</div><div className="pw">reviewer has 0m left · waiting</div></div></div>
           </div>
         </div></div>
