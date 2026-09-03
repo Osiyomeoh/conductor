@@ -380,3 +380,37 @@ def test_hiring_proposals_are_only_for_non_judgment_work():
     c.run(ticks=4)
     for p in team(c)["proposals"]:
         assert p["kind"] not in ("product", "design")   # judgment kinds
+
+
+# --- real execution substrate -----------------------------------------------
+
+def test_only_verified_work_reaches_the_base(tmp_path):
+    """The core guarantee, made literal: an agent's work runs in a real git
+    worktree and the base advances only when its evidence passes. Wrong work
+    is discarded and leaves no trace."""
+    import subprocess
+    from conductor.execution import GitExecutor, init_repo
+
+    repo = init_repo(str(tmp_path / "ws"))
+    gx = GitExecutor(repo)
+
+    gx.open("c/good")
+    open(f"{gx.wt_root}/c_good/f.py", "w").write("def add(a,b): return a+b\n")
+    gx.commit("c/good", "work")
+    ok, _ = gx.verify_in("c/good", "python3 -c 'import f; assert f.add(2,3)==5'")
+    assert ok
+    merged, _ = gx.merge("c/good")
+    assert merged
+
+    gx.open("c/bad")
+    open(f"{gx.wt_root}/c_bad/f.py", "w").write("def add(a,b): return a-b\n")
+    gx.commit("c/bad", "claim")
+    bad, _ = gx.verify_in("c/bad", "python3 -c 'import f; assert f.add(2,3)==5'")
+    assert not bad
+    gx.discard("c/bad")
+
+    # The base has the correct implementation and the bad branch is gone.
+    assert "return a+b" in open(f"{repo}/f.py").read()
+    branches = subprocess.run(["git", "-C", repo, "branch"], capture_output=True,
+                              text=True).stdout
+    assert "c/bad" not in branches and "c/good" not in branches
