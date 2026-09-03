@@ -194,3 +194,21 @@ button.b.primary{background:var(--accent);border-color:var(--accent);color:#0419
 .intent-box:focus{border-color:var(--accent);background:var(--e2)}
 .linky{background:transparent;border:0;color:var(--accent);font-family:var(--sans);font-size:12px;cursor:pointer;padding:0}
 .linky:hover{text-decoration:underline}
+.actbar{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:22px}
+.actworker{display:flex;align-items:center;gap:10px;border:1px solid var(--line);border-radius:9999px;padding:7px 14px;background:var(--e1)}
+.aw-name{font-family:var(--mono);font-size:12px;color:var(--t1)}
+.aw-stat{font-family:var(--mono);font-size:11px}
+.aw-stat.pass{color:var(--pass)} .aw-stat.fail{color:var(--fail)}
+.stream{border-left:1px solid var(--line);margin-left:6px}
+.sitem{display:grid;grid-template-columns:14px 66px 1fr;gap:10px;align-items:start;padding:11px 0 11px 16px;position:relative}
+.sdot{width:8px;height:8px;border-radius:50%;background:var(--t3);margin-left:-20px;margin-top:5px;flex:none}
+.tone-pass .sdot{background:var(--pass)} .tone-fail .sdot{background:var(--fail)}
+.tone-hold .sdot{background:var(--held)} .tone-ask .sdot{background:var(--held)}
+.tone-run .sdot,.tone-claim .sdot,.tone-spec .sdot{background:var(--accent)}
+.tone-answer .sdot{background:var(--pass)}
+.stime{font-size:11px;color:var(--t3);padding-top:2px}
+.sactor{font-weight:600;font-size:13.5px}
+.sverb{color:var(--t2);font-size:13.5px}
+.stitle2{font-size:13.5px;color:var(--t1)}
+.tone-fail .sverb{color:var(--fail)} .tone-pass .sverb{color:var(--pass)}
+.sdetail{font-size:11px;color:var(--t3);margin-top:3px;word-break:break-word}

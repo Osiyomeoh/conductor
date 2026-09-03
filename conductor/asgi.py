@@ -23,7 +23,7 @@ from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
 from .auth import Principal, auth_required, mint_session, principal_from
 from .config import CONFIG
 from .registry import Registry
-from .server import LANDING, ONBOARDING, UI, UI_DIR, decision_detail, state, team
+from .server import LANDING, ONBOARDING, UI, UI_DIR, activity, decision_detail, state, team
 from .world import persistent
 
 log = logging.getLogger("conductor.asgi")
@@ -79,6 +79,11 @@ def api_state(p: Principal = Depends(caller)):
 @app.get("/api/team")
 def api_team(p: Principal = Depends(caller)):
     return registry.read(p.tenant, team)
+
+
+@app.get("/api/activity")
+def api_activity(p: Principal = Depends(caller)):
+    return registry.read(p.tenant, activity)
 
 
 @app.get("/api/plan")

@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { api } from "./api";
-import type { State, DecisionSummary, DecisionDetail, Team, Plan } from "./types";
+import type { State, DecisionSummary, DecisionDetail, Team, Plan, Activity } from "./types";
 import { useCount } from "./hooks";
 
 const esc = (s: unknown) => String(s ?? "");
@@ -143,6 +143,49 @@ export function CostView({ s }: { s: State }) {
             {t.detail && !t.detail.includes("no history") && <div className="tdetail">{t.detail}</div>}</div>;
         })}</div>
     </div></div></div>
+  </>);
+}
+
+export function ActivityView() {
+  const [a, setA] = useState<Activity | null>(null);
+  useEffect(() => {
+    let alive = true;
+    const load = () => { void api.activity().then((x) => { if (alive) setA(x); }); };
+    load(); const t = setInterval(load, 4000);
+    return () => { alive = false; clearInterval(t); };
+  }, []);
+  if (!a) return <><Head title="Activity" sub="loading" /><div className="vbody" /></>;
+  const workers = Object.entries(a.by_worker);
+  return (<>
+    <Head title="Activity" sub="every action, attributed, from the durable event log" />
+    <div className="vbody"><div className="vwrap">
+      {workers.length > 0 && (
+        <div className="actbar">
+          {workers.map(([w, s]) => (
+            <div className="actworker" key={w}>
+              <span className="aw-name">{w}</span>
+              <span className="aw-stat pass">{s.verified} verified</span>
+              {s.caught > 0 && <span className="aw-stat fail">{s.caught} caught</span>}
+            </div>
+          ))}
+        </div>
+      )}
+      <div className="stream">
+        {a.events.map((e) => (
+          <div className={`sitem tone-${e.tone}`} key={e.seq}>
+            <span className="sdot" />
+            <span className="stime mono">{e.at}</span>
+            <div className="sbody">
+              <span className="sactor">{e.actor ?? "conductor"}</span>{" "}
+              <span className="sverb">{e.verb}</span>{" "}
+              {e.title && <span className="stitle2">{e.title}</span>}
+              {e.detail && <div className="sdetail mono">{e.detail}</div>}
+            </div>
+          </div>
+        ))}
+        {a.events.length === 0 && <div className="note" style={{ padding: 20 }}>No activity yet. Plan a sprint and run the loop.</div>}
+      </div>
+    </div></div>
   </>);
 }
 

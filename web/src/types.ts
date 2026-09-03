@@ -99,3 +99,12 @@ export interface Plan {
   commitments: PlanItem[]; rejected: { title: string; reason: string }[];
   assumptions: string[];
 }
+
+export interface ActivityEvent {
+  seq: number; at: string; kind: string; tone: string; verb: string;
+  actor: string | null; title: string | null; detail: string;
+}
+export interface Activity {
+  events: ActivityEvent[];
+  by_worker: Record<string, { verified: number; caught: number }>;
+}

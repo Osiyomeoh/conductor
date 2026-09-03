@@ -1,13 +1,14 @@
 import { useEffect, useState } from "react";
 import { useConductor, useTheme } from "./hooks";
 import { Glyph } from "./logo";
-import { BoardView, CostView, DecisionsView, DecisionOverlay, HomeView, PlanOverlay, TeamView } from "./views";
+import { ActivityView, BoardView, CostView, DecisionsView, DecisionOverlay, HomeView, PlanOverlay, TeamView } from "./views";
 
-type ViewName = "home" | "board" | "decisions" | "team" | "cost";
+type ViewName = "home" | "board" | "decisions" | "activity" | "team" | "cost";
 const NAV: { view: ViewName; icon: string; label: string }[] = [
   { view: "home", icon: "◎", label: "Home" },
   { view: "board", icon: "▤", label: "Board" },
   { view: "decisions", icon: "◇", label: "Decisions" },
+  { view: "activity", icon: "≋", label: "Activity" },
   { view: "team", icon: "◐", label: "Team" },
   { view: "cost", icon: "$", label: "Cost & trust" },
 ];
@@ -51,6 +52,7 @@ export function App() {
         {view === "home" && <HomeView s={state} onOpen={setOpenDecision} onAnswer={(id, c) => void answer(id, c)} onPlan={() => setPlanOpen(true)} />}
         {view === "board" && <BoardView s={state} onTick={(k) => void tick(k)} />}
         {view === "decisions" && <DecisionsView s={state} onOpen={setOpenDecision} onAnswer={(id, c) => void answer(id, c)} />}
+        {view === "activity" && <ActivityView />}
         {view === "team" && <TeamView />}
         {view === "cost" && <CostView s={state} />}
       </main>

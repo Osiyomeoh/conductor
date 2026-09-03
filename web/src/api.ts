@@ -1,4 +1,4 @@
-import type { State, Team, DecisionDetail, Plan } from "./types";
+import type { State, Team, DecisionDetail, Plan, Activity } from "./types";
 
 // Thin typed client. Every call returns a typed promise, so a view that reads
 // a field the API does not send fails to compile.
@@ -20,6 +20,7 @@ async function post<T>(path: string, body: unknown): Promise<T> {
 export const api = {
   state: () => get<State>("/api/state"),
   team: () => get<Team>("/api/team"),
+  activity: () => get<Activity>("/api/activity"),
   plan: (intent?: string) => post<Plan>("/api/plan", { intent: intent ?? "" }),
   approve: (intent: string) => post<State & { approved: number; planned_by: string }>("/api/approve", { intent }),
   decision: (id: string) => get<DecisionDetail>(`/api/decision?id=${encodeURIComponent(id)}`),

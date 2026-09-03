@@ -92,6 +92,70 @@ def state(c) -> dict:
     }
 
 
+def activity(c, limit: int = 120) -> dict:
+    """The agent activity stream: every meaningful action, attributed to the
+    worker that took it, read from the durable event log. This is Conductor's
+    observability, the transparent record of what each agent did and what the
+    verification runner decided about it."""
+    from .events import EventKind
+    g = c.graph
+    verbs = {
+        EventKind.PLANNED: ("planned", "plan"),
+        EventKind.HIRED: ("joined the roster", "hire"),
+        EventKind.DISPATCHED: ("picked up", "run"),
+        EventKind.CLAIMED: ("reported complete", "claim"),
+        EventKind.VERIFIED: ("verified and merged", "pass"),
+        EventKind.REJECTED: ("caught wrong, re-dispatched", "fail"),
+        EventKind.HELD: ("held for review capacity", "hold"),
+        EventKind.ESCALATED: ("raised a decision", "ask"),
+        EventKind.ANSWERED: ("answered by a human", "answer"),
+        EventKind.SPECULATED: ("forked speculative branches", "spec"),
+        EventKind.DISCARDED: ("discarded a losing branch", "discard"),
+        EventKind.BLOCKED: ("blocked by policy", "block"),
+    }
+    rows = []
+    last_key = None
+    for e in c.recorder.history():
+        # A held commitment is re-recorded every tick; collapse the repeats so
+        # the stream reads as actions, not polling.
+        key = (e.kind, e.commitment_id)
+        if e.kind is EventKind.HELD and key == last_key:
+            continue
+        last_key = key
+        verb, tone = verbs.get(e.kind, (e.kind.value, "run"))
+        title = None
+        if e.commitment_id and e.commitment_id in g.commitments:
+            title = g.get(e.commitment_id).title
+        detail = ""
+        d = e.data or {}
+        if e.kind is EventKind.VERIFIED:
+            detail = str(d.get("detail", ""))[:140]
+        elif e.kind is EventKind.REJECTED:
+            detail = str(d.get("detail", ""))[:140]
+        elif e.kind is EventKind.HELD:
+            detail = f"reviewer {d.get('reviewer','')} · needs {d.get('cost','?')}m"
+        elif e.kind is EventKind.DISPATCHED:
+            detail = f"attempt {d.get('attempt', 1)}"
+        elif e.kind is EventKind.ANSWERED:
+            detail = f"chose {d.get('choice','')}"
+        elif e.kind is EventKind.ESCALATED:
+            detail = str(d.get("question", ""))[:120]
+        rows.append({
+            "seq": e.seq, "at": e.at[11:19] if len(e.at) > 19 else e.at,
+            "kind": e.kind.value, "tone": tone, "verb": verb,
+            "actor": e.actor, "title": title, "detail": detail,
+        })
+    rows = rows[-limit:][::-1]
+    # a compact by-worker tally for the header
+    by_worker: dict[str, dict] = {}
+    from .events import EventKind as EK
+    for e in c.recorder.history():
+        if e.actor and e.kind in (EK.VERIFIED, EK.REJECTED):
+            w = by_worker.setdefault(e.actor, {"verified": 0, "caught": 0})
+            w["verified" if e.kind is EK.VERIFIED else "caught"] += 1
+    return {"events": rows, "by_worker": by_worker}
+
+
 def team(c) -> dict:
     """The roster: humans and agents as one team, plus any hiring the graph
     currently justifies. An agent is a colleague with a record, not a
@@ -216,6 +280,9 @@ def serve(conductor, port: int = 7616, open_browser: bool = True):
             elif self.path.startswith("/api/team"):
                 with lock:
                     self._send(200, json.dumps(team(conductor)))
+            elif self.path.startswith("/api/activity"):
+                with lock:
+                    self._send(200, json.dumps(activity(conductor)))
             elif self.path.startswith("/api/plan"):
                 from .planning import propose
                 with lock:
