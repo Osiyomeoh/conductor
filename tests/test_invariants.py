@@ -460,3 +460,36 @@ def test_loop_verifies_in_worktree_and_merges_only_passing_work(tmp_path):
     assert "return a+b" in open(os.path.join(repo, "feature.py")).read()
     assert t.get("agent_impl", "code").failures == 1   # the wrong first attempt
     assert t.get("agent_impl", "code").passes == 1
+
+
+def test_real_repo_run_merges_only_verified_code(tmp_path):
+    """The reproducible real-git demo: wrong code is caught by its check and
+    never reaches the base; the base ends holding only correct implementations."""
+    import os, subprocess, importlib.util
+    from conductor.realworld import build
+
+    c = build(str(tmp_path / "ws"))
+    c.run(ticks=10)
+    q = [d for d in c.surface.queue() if len(d.options) >= 2]
+    if q:
+        c.answer(q[0].id, q[0].options[0]); c.run(ticks=6)
+
+    repo = c.executor.repo
+    # Every code task is done; the two buggy-first ones took a retry.
+    by_title = {cm.title: cm for cm in c.graph}
+    assert by_title["Implement slugify(text)"].status is Status.DONE
+    assert by_title["Implement slugify(text)"].attempts == 2
+    assert by_title["Implement exponential backoff(attempt)"].attempts == 2
+    assert c.metrics.claims_rejected >= 2      # the wrong first attempts
+
+    # The correct implementations are what landed on the base.
+    for name, call, want in (("slugify", lambda m: m.slugify("Hello World"), "hello-world"),
+                             ("backoff", lambda m: m.backoff(3), 8)):
+        p = os.path.join(repo, f"{name}.py")
+        spec = importlib.util.spec_from_file_location(name, p)
+        mod = importlib.util.module_from_spec(spec); spec.loader.exec_module(mod)
+        assert call(mod) == want
+
+    # No conductor worktree branches survive.
+    branches = subprocess.run(["git", "-C", repo, "branch"], capture_output=True, text=True).stdout
+    assert "conductor/" not in branches

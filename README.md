@@ -142,6 +142,27 @@ agentcore invoke '{"action": "state"}'
 
 Actions: `state`, `tick`, `run`, `answer`, `plan`, `ask`.
 
+## Real mode: agents work in git worktrees
+
+`real_demo.py` runs the whole loop against a real git repository with a
+deterministic code-writing worker, so the core guarantee is shown end to end
+with no model and no network:
+
+- each commitment's work runs in its own `git worktree` on its own branch
+- the evidence command runs inside that worktree
+- a pass merges the branch to the base with a real merge commit; a fail deletes
+  the worktree so wrong work never touches the base
+
+In the seeded backlog two tasks come back confident and wrong the first time
+(slugify forgets to lowercase; backoff is off by one). Both are caught by their
+checks and discarded before any human looks, recovery re-dispatches, and the
+retries pass. The base branch ends holding only the correct implementations,
+and every `conductor/*` worktree is cleaned up.
+
+`world.build(repo=...)` opens the loop in this mode against any repository. The
+live Strands worker writes into these same worktrees; the deterministic worker
+is the reproducible, throttle-free path used for the demo and tests.
+
 ## Persistence and replay
 
 The loop is idempotent per tick, so the durable thing is not the graph, it is
