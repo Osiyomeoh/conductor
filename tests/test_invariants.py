@@ -558,3 +558,32 @@ def test_config_selects_store_from_environment(tmp_path, monkeypatch):
     assert isinstance(cfg.Config().store(), JsonlStore)
     monkeypatch.delenv("CONDUCTOR_EVENT_LOG", raising=False)
     importlib.reload(cfg)
+
+
+def test_server_state_survives_restart(tmp_path):
+    """Durability: a fresh process resuming the same log rebuilds the work and
+    the trust the previous one left, and continues onto the same log."""
+    from conductor.events import JsonlStore
+    from conductor.world import persistent
+
+    log = str(tmp_path / "c.jsonl")
+
+    c1 = persistent(store=JsonlStore(log), tenant="acme")
+    c1.run(ticks=6)
+    done1 = {x.id: x.status for x in c1.graph if x.status is Status.DONE}
+    trust1 = {k: (r.passes, r.failures) for k, r in c1.trust.records.items()}
+    assert done1 and trust1
+
+    c2 = persistent(store=JsonlStore(log), tenant="acme")   # restart
+    done2 = {x.id: x.status for x in c2.graph if x.status is Status.DONE}
+    trust2 = {k: (r.passes, r.failures) for k, r in c2.trust.records.items()}
+    assert done2 == done1
+    assert trust2 == trust1
+
+    before = sum(1 for _ in open(log))
+    c2.run(ticks=6)
+    assert sum(1 for _ in open(log)) > before      # continues onto the same log
+
+    # A different tenant on the same store is isolated.
+    c3 = persistent(store=JsonlStore(log), tenant="other")
+    assert not any(x.id in done1 for x in c3.graph)

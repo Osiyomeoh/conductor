@@ -11,10 +11,14 @@ default). Nothing runs until you drive it from the UI — click 'Run six' or
 import os, tempfile
 
 os.environ.setdefault("CONDUCTOR_PROVIDER", "gemini")
+from conductor.config import CONFIG
+from conductor.logging_setup import setup
 from conductor.realworld import build
 from conductor.server import serve
 
+setup()
 repo = os.environ.get("CONDUCTOR_REPO") or os.path.join(tempfile.mkdtemp(), "workspace")
+# Live realworld build; state still records to the configured store.
 c = build(repo, live=True)
 print(f"LIVE workspace at {repo}  (provider: {os.environ['CONDUCTOR_PROVIDER']})")
 print("Nothing runs until you click Run in the UI.")

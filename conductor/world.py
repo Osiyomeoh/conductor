@@ -34,7 +34,7 @@ def _cm(title, token, kind, **kw) -> Commitment:
 
 
 def build(seed: int = 7, store=None, tenant: str = "default",
-          repo: str | None = None) -> Conductor:
+          repo: str | None = None, seed_commitments: bool = True) -> Conductor:
     shutil.rmtree(WORKDIR, ignore_errors=True)
     os.makedirs(WORKDIR, exist_ok=True)
 
@@ -76,8 +76,9 @@ def build(seed: int = 7, store=None, tenant: str = "default",
         ambiguous=True, work_kind="design", owner="human_sarah", review_cost_minutes=30)
     design.dependencies = [pricing.id]
 
-    for c in (webhook, tests, research, migration, copy, pricing, design):
-        g.add(c)
+    if seed_commitments:
+        for c in (webhook, tests, research, migration, copy, pricing, design):
+            g.add(c)
 
     trust = TrustLedger()
     cost = CostLedger()
@@ -104,3 +105,32 @@ def build(seed: int = 7, store=None, tenant: str = "default",
     return Conductor(graph=g, verifier=verifier, dispatcher=disp, surface=surface,
                      speculation=spec, trust=trust, cost=cost,
                      recorder=recorder, executor=executor)
+
+
+def persistent(store=None, tenant: str = "default", seed: int = 7,
+               repo: str | None = None):
+    """Resume from a durable log if one exists for this tenant, otherwise seed
+    a fresh sprint. Either way the returned Conductor has a fully wired
+    dispatcher, workers, budgets and trust; only the commitments and their
+    outcomes come from the log on resume.
+
+    This is what makes the running server durable: a restart rebuilds the work
+    and the trust the previous process left, and continues recording onto the
+    same log."""
+    from .config import CONFIG
+    from .replay import rebuild
+    store = store or CONFIG.store()
+    resuming = store.last_seq(tenant) > 0
+
+    # Build the scaffold. On resume, suppress recording and add no seed
+    # commitments, so replaying the log is the only source of state.
+    c = build(seed=seed, store=store, tenant=tenant, repo=repo,
+              seed_commitments=not resuming)
+    if resuming:
+        c.recorder.replaying = True
+        try:
+            seq = rebuild(c.graph, c.recorder.history(), trust=c.trust)
+        finally:
+            c.recorder.replaying = False
+        c.emit(f"resumed from durable log at sequence {seq}")
+    return c

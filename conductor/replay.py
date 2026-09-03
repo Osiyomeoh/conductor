@@ -83,12 +83,20 @@ def apply(graph, event: Event) -> None:
     cm.history.append(f"{event.at}  replay:{event.kind.value}")
 
 
-def rebuild(graph, events) -> int:
+def rebuild(graph, events, trust=None) -> int:
     """Fold the log over a graph, creating nodes as PLANNED events introduce
-    them. Returns the sequence reached, which is where a resumed loop starts."""
+    them. Returns the sequence reached, which is where a resumed loop starts.
+
+    If a trust ledger is given, rebuild it too: every verified or rejected claim
+    is one outcome, and a commitment already carries its work kind, so the
+    ledger a resumed worker sees is exactly the one the prior run left."""
     seq = 0
     for e in events:
         apply(graph, e)
+        if trust is not None and e.kind in (EventKind.VERIFIED, EventKind.REJECTED) \
+                and e.actor and e.commitment_id in graph.commitments:
+            kind = graph.get(e.commitment_id).work_kind
+            trust.record(e.actor, kind, e.kind is EventKind.VERIFIED)
         seq = max(seq, e.seq)
     return seq
 
