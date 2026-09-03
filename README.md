@@ -132,6 +132,31 @@ agentcore invoke '{"action": "state"}'
 
 Actions: `state`, `tick`, `run`, `answer`, `plan`, `ask`.
 
+## Persistence and replay
+
+The loop is idempotent per tick, so the durable thing is not the graph, it is
+the sequence of facts that produced it. Every meaningful transition is appended
+to an event log: planned, hired, dispatched, held, claimed, verified, rejected,
+escalated, answered, speculated, discarded.
+
+```bash
+.venv/bin/python replay_demo.py
+```
+
+That runs a sprint, persists it, then rebuilds the entire graph from the log
+alone and checks the result against the live run. No workers run, no checks
+execute, no money is spent, and the reconstruction is exact.
+
+Three backends sit behind one interface: in-memory, JSONL, and DynamoDB
+partitioned by tenant and sorted by sequence, with a conditional write so a
+replayed tick cannot double-record a fact. Events carry a tenant, so one log
+holds many teams without the graph ever seeing another team's work.
+
+This buys three things Conductor specifically needs. The loop survives a restart
+mid-sprint. "Why is this done?" has an answer with a timestamp on it, which
+matters most for the one transition the whole product turns on. And a demo can
+replay a real run without dispatching live agents at it.
+
 ## Cost
 
 Conductor deliberately spends compute to save attention, so the spending is
@@ -161,7 +186,7 @@ invariant tests. The seeded sprint runs end to end with real shell verification.
 Not yet exercised against Bedrock: the four Strands agents. Written against the
 verified SDK API, but no live model call has been made.
 
-Stubs: in-memory state, no board or chat adapters.
+Stubs: no board or chat adapters.
 
 ## Licence
 
