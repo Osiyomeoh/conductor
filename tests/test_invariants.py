@@ -20,7 +20,7 @@ from conductor.cost import CostLedger
 from conductor.decisions import DecisionSurface
 from conductor.graph import CommitmentGraph
 from conductor.models import (Action, Commitment, Decision, Evidence, EvidenceKind,
-                              Resource, ResourceType, Status)
+                              Resource, ResourceType, Status, now)
 from conductor.policy import PolicyEngine
 from conductor.roster import AgentSpec, Roster
 from conductor.trust import TrustLedger
@@ -414,3 +414,49 @@ def test_only_verified_work_reaches_the_base(tmp_path):
     branches = subprocess.run(["git", "-C", repo, "branch"], capture_output=True,
                               text=True).stdout
     assert "c/bad" not in branches and "c/good" not in branches
+
+
+def test_loop_verifies_in_worktree_and_merges_only_passing_work(tmp_path):
+    """The executor wired into the loop: dispatched work runs in a real
+    worktree, and the base advances only for a claim that survives its check."""
+    import os, random, subprocess
+    from conductor.attention import AttentionBudget
+    from conductor.cost import CostLedger
+    from conductor.decisions import DecisionSurface
+    from conductor.dispatcher import Dispatcher
+    from conductor.execution import GitExecutor, init_repo
+    from conductor.loop import Conductor
+    from conductor.policy import PolicyEngine
+    from conductor.speculation import SpeculationEngine
+    from conductor.verification import VerificationRunner
+
+    repo = init_repo(str(tmp_path / "ws")); gx = GitExecutor(repo)
+
+    class W:
+        id = "agent_impl"
+        def __init__(s): s.rng = random.Random(2)
+        def dispatch(s, cm, context=""):
+            cm.attempts += 1; cm.owner = s.id
+            cm.status = Status.DISPATCHED; cm.last_signal = now()
+            wt = gx.open(cm.branch)
+            body = "return a+b" if cm.attempts > 1 else "return a-b"
+            open(os.path.join(wt, "feature.py"), "w").write(f"def add(a,b): {body}\n")
+            cm.status = Status.CLAIMED_DONE; cm.last_signal = now()
+
+    g = CommitmentGraph()
+    g.add_resource(Resource("human_sam", ResourceType.HUMAN, "Sam"))
+    g.add_resource(Resource("agent_impl", ResourceType.AGENT, "impl-agent", ["code"]))
+    c = cm("Implement add()", spec="python3 -c 'import feature; assert feature.add(2,3)==5'",
+           work_kind="code", review_cost_minutes=10)
+    c.branch = "conductor/cm_add"; g.add(c)
+    t = TrustLedger(); d = Dispatcher(graph=g, policy=PolicyEngine(), trust=t)
+    d.budgets["human_sam"] = AttentionBudget("human_sam", 120); d.workers = {"agent_impl": W()}
+    C = Conductor(graph=g, verifier=VerificationRunner(workdir=repo), dispatcher=d,
+                  surface=DecisionSurface(graph=g), speculation=SpeculationEngine(graph=g),
+                  trust=t, cost=CostLedger(), executor=gx)
+    C.run(ticks=8)
+
+    assert c.status is Status.DONE
+    assert "return a+b" in open(os.path.join(repo, "feature.py")).read()
+    assert t.get("agent_impl", "code").failures == 1   # the wrong first attempt
+    assert t.get("agent_impl", "code").passes == 1

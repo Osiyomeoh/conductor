@@ -52,6 +52,7 @@ class Conductor:
     events: list[str] = field(default_factory=list)
     metrics: Metrics = field(default_factory=Metrics)
     silence_hours: float = 4.0
+    executor: object = None  # GitExecutor for real mode; None = scratch-dir demo
 
     def emit(self, msg: str) -> None:
         self.events.append(f"{now().isoformat(timespec='seconds')}  {msg}")
@@ -91,10 +92,16 @@ class Conductor:
 
     # ------------------------------------------------------------------
     def _verify_claims(self) -> None:
-        """Done is a claim, not a fact. This is where claims meet reality."""
+        """Done is a claim, not a fact. This is where claims meet reality.
+
+        With a real executor, the check runs inside the commitment's git
+        worktree and a pass is a real merge, a fail a real discard. Without one,
+        the verifier runs against the shared scratch dir (the deterministic
+        demo path). Either way, the verdict comes from running the evidence,
+        never from the worker's word."""
         for cm in self.graph.claimed():
             self.metrics.claims += 1
-            passed = self.verifier.verify(cm)
+            passed = self._verify_one(cm)
             self.trust.record(cm.owner, cm.work_kind, passed)
             worker = self.graph.resources.get(cm.owner or "")
             if worker:
@@ -115,6 +122,29 @@ class Conductor:
                 self.record(EventKind.REJECTED, commitment_id=cm.id, actor=cm.owner,
                             detail=cm.evidence.detail[:200], attempt=cm.attempts)
                 self.emit(f"REJECT {cm.title}: {cm.evidence.detail[:90]}")
+
+    def _verify_one(self, cm) -> bool:
+        """Run a commitment's evidence, in its real worktree when there is one."""
+        from .models import EvidenceKind, Status, now
+        ex = self.executor
+        if ex is None or cm.branch is None or cm.evidence.kind is not EvidenceKind.COMMAND:
+            return self.verifier.verify(cm)
+
+        # Real path: commit the worker's output, run the check in the worktree.
+        ex.commit(cm.branch, f"{cm.owner or 'worker'}: {cm.title}")
+        cm.evidence.checked_at = now()
+        ok, detail = ex.verify_in(cm.branch, cm.evidence.spec)
+        cm.evidence.passed, cm.evidence.detail = ok, detail
+        if ok:
+            merged, mdetail = ex.merge(cm.branch)
+            cm.status = Status.DONE
+            cm.evidence.detail = f"verified and {mdetail}"
+            cm.log(f"verified in {cm.branch}, merged to base")
+        else:
+            ex.discard(cm.branch)   # wrong work leaves no trace on the base
+            cm.status = Status.REJECTED
+            cm.log(f"REJECTED in {cm.branch}, worktree discarded: {detail[:80]}")
+        return ok
 
     def _recover(self) -> None:
         """Graduated protocols. Rejected work goes back with the failure as

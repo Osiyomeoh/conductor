@@ -33,7 +33,8 @@ def _cm(title, token, kind, **kw) -> Commitment:
     return cm
 
 
-def build(seed: int = 7, store=None, tenant: str = "default") -> Conductor:
+def build(seed: int = 7, store=None, tenant: str = "default",
+          repo: str | None = None) -> Conductor:
     shutil.rmtree(WORKDIR, ignore_errors=True)
     os.makedirs(WORKDIR, exist_ok=True)
 
@@ -93,6 +94,13 @@ def build(seed: int = 7, store=None, tenant: str = "default") -> Conductor:
 
     surface = DecisionSurface(graph=g)
     spec = SpeculationEngine(graph=g, ledger=cost)
+
+    # Real mode: agent work runs in git worktrees against `repo`, merged only
+    # on a passing check. Left None, the seeded demo uses the scratch dir.
+    executor = None
+    if repo:
+        from .execution import GitExecutor, init_repo
+        executor = GitExecutor(init_repo(repo))
     return Conductor(graph=g, verifier=verifier, dispatcher=disp, surface=surface,
                      speculation=spec, trust=trust, cost=cost,
-                     recorder=recorder)
+                     recorder=recorder, executor=executor)
