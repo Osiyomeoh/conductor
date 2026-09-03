@@ -83,6 +83,50 @@ def state(c) -> dict:
     }
 
 
+def decision_detail(c, decision_id: str) -> dict:
+    """Everything behind one question: the branches built while it waited, the
+    work verified inside each, and the escalations it was compressed from.
+
+    This is the view that shows what no other tool can, that the waiting time
+    was already spent doing the work."""
+    g = c.graph
+    d = c.surface.open.get(decision_id)
+    if d is None:
+        for a in c.surface.answered:
+            if a.id == decision_id:
+                d = a
+                break
+    if d is None:
+        return {"error": "unknown decision"}
+
+    branches = []
+    for b in sorted((b for b in c.speculation.branches.values()
+                     if b.decision_id == d.id), key=lambda b: b.option):
+        work = []
+        for cid in b.commitments:
+            cm = g.get(cid)
+            work.append({"title": cm.title, "status": cm.status.value,
+                         "evidence": cm.evidence.spec,
+                         "passed": cm.evidence.passed})
+        verified = sum(1 for w in work if w["status"] == "done")
+        branches.append({
+            "option": b.option, "cost": round(c.cost.for_branch(b.id), 4),
+            "verified": verified, "total": len(work),
+            "chosen": d.answer == b.option,
+            "discarded": b.discarded, "work": work})
+
+    return {
+        "id": d.id, "question": d.root_question, "options": d.options,
+        "answer": d.answer, "unblocks": d.unblock_value,
+        "compressed_from": [{"id": cid, "title": g.get(cid).title
+                             if cid in g.commitments else cid}
+                            for cid in ([*d.merged_from, *d.blocked])],
+        "branches": branches,
+        "spent": round(c.cost.for_decision(d.id), 4),
+        "needs_framing": len(d.options) < 2,
+    }
+
+
 def serve(conductor, port: int = 7616, open_browser: bool = True):
     lock = threading.Lock()
 
@@ -99,7 +143,12 @@ def serve(conductor, port: int = 7616, open_browser: bool = True):
             self.wfile.write(b)
 
         def do_GET(self):
-            if self.path.startswith("/api/state"):
+            if self.path.startswith("/api/decision"):
+                from urllib.parse import parse_qs, urlparse
+                did = parse_qs(urlparse(self.path).query).get("id", [""])[0]
+                with lock:
+                    self._send(200, json.dumps(decision_detail(conductor, did)))
+            elif self.path.startswith("/api/state"):
                 with lock:
                     self._send(200, json.dumps(state(conductor)))
             elif self.path in ("/", "/index.html"):

@@ -34,6 +34,7 @@
   --held:#f7bf8b; --held-bg:rgba(247,191,139,.10);
 }
 *{box-sizing:border-box;margin:0}
+[hidden]{display:none!important}
 html{background:var(--ground)}
 body{background:var(--ground);color:var(--t1);font-family:var(--sans);
   font-size:14px;line-height:1.5;-webkit-font-smoothing:antialiased;
@@ -139,6 +140,55 @@ section{margin-bottom:30px}
   border-top:1px solid var(--line);word-break:break-word}
 .log div:first-child{border-top:0;color:var(--t2)}
 .compression{font-family:var(--mono);font-size:11px;color:var(--t3);letter-spacing:.02em}
+.see{border-color:transparent;color:var(--accent);padding:9px 10px}
+.see:hover{background:var(--e2);border-color:transparent}
+
+/* decision detail overlay */
+.overlay{position:fixed;inset:0;z-index:50;display:flex;align-items:flex-start;
+  justify-content:center;padding:56px 24px;overflow:auto;
+  background:rgba(0,0,0,.5);backdrop-filter:blur(3px);
+  animation:fade .18s ease}
+@keyframes fade{from{opacity:0}to{opacity:1}}
+.sheet{width:100%;max-width:920px;background:var(--surface);
+  border:1px solid var(--line);border-radius:16px;padding:30px 32px 34px;
+  box-shadow:0 24px 80px rgba(0,0,0,.45)}
+.sheet .close{position:absolute;top:20px;right:24px}
+.d-q{font-size:30px;font-weight:600;letter-spacing:-.02em;line-height:1.08;
+  text-wrap:balance;max-width:80%}
+.d-id{font-family:var(--mono);font-size:12px;color:var(--t3);margin-top:8px}
+.d-meta{color:var(--t2);font-size:13px;margin-top:6px}
+.answered{display:inline-flex;align-items:center;gap:7px;margin-top:14px;
+  font-family:var(--mono);font-size:11px;letter-spacing:.06em;text-transform:uppercase;
+  color:var(--pass);background:var(--pass-bg);padding:4px 11px;border-radius:9999px}
+
+.diagram{margin:26px 0 8px}
+.dcap{color:var(--t3);font-size:12.5px;margin:2px 4px 22px;max-width:640px}
+.branches{display:grid;gap:16px;grid-template-columns:repeat(auto-fit,minmax(220px,1fr))}
+.branch{border:1px solid var(--line);border-radius:12px;padding:16px;background:var(--e1);
+  position:relative;transition:border-color .15s}
+.branch.chosen{border-color:var(--pass);background:var(--pass-bg)}
+.branch.discarded{opacity:.5}
+.b-head{display:flex;justify-content:space-between;align-items:baseline;gap:10px;margin-bottom:4px}
+.b-opt{font-size:15px;font-weight:600;letter-spacing:-.01em;line-height:1.25}
+.b-cost{font-family:var(--mono);font-size:12px;color:var(--t3);white-space:nowrap}
+.b-state{font-family:var(--mono);font-size:10.5px;letter-spacing:.05em;text-transform:uppercase;
+  margin:8px 0 12px;color:var(--t3)}
+.b-state.chosen{color:var(--pass)} .b-state.gone{color:var(--t3)}
+.w{display:flex;gap:9px;align-items:flex-start;padding:8px 0;border-top:1px solid var(--line)}
+.w:first-of-type{border-top:0}
+.w .tick{color:var(--pass);font-family:var(--mono);font-size:12px;flex:none;margin-top:1px}
+.w .wt{font-size:12.5px}
+.w .we{font-family:var(--mono);font-size:10.5px;color:var(--t3);margin-top:3px;word-break:break-all}
+.d-opts{display:flex;flex-wrap:wrap;gap:10px;margin-top:24px}
+.d-opts button{padding:11px 18px;border-color:var(--line-strong)}
+.d-opts button.chosen{background:var(--accent);border-color:var(--accent);color:#fff}
+.folded{margin-top:26px;border-top:1px solid var(--line);padding-top:16px}
+.folded summary{font-family:var(--mono);font-size:11px;letter-spacing:.1em;
+  text-transform:uppercase;color:var(--t3);cursor:pointer;list-style:none}
+.folded summary::-webkit-details-marker{display:none}
+.folded ul{list-style:none;padding:0;margin:12px 0 0}
+.folded li{font-family:var(--mono);font-size:11.5px;color:var(--t2);padding:4px 0}
+.folded li span{color:var(--t3)}
 ::-webkit-scrollbar{width:8px;height:8px}
 ::-webkit-scrollbar-thumb{background:var(--e3);border-radius:9999px}
 </style>
@@ -185,6 +235,10 @@ section{margin-bottom:30px}
       <section><div class="label">Log</div><div class="card log" id="log"></div></section>
     </div>
   </main>
+</div>
+
+<div class="overlay" id="overlay" hidden onclick="if(event.target===this)closeDecision()">
+  <div class="sheet" id="sheet"></div>
 </div>
 
 <script>
@@ -239,7 +293,8 @@ function render(s){
         ${d.needs_framing
           ? `<div class="note">No options yet. This one needs framing before anyone can answer it, so nothing was speculated against it.</div>`
           : `<div class="opts">${d.options.map(o=>
-              `<button onclick="answer('${d.id}','${esc(o)}')">${esc(o)}</button>`).join("")}</div>`}
+              `<button onclick="event.stopPropagation();answer('${d.id}','${esc(o)}')">${esc(o)}</button>`).join("")}
+             ${d.branches?`<button class="ghost see" onclick="event.stopPropagation();openDecision('${d.id}')">See the branches →</button>`:""}</div>`}
       </div>`).join("");
 
   $("board").innerHTML = s.board.map(x=>`
@@ -282,8 +337,70 @@ async function post(path, body){
   render(await (await fetch(path,{method:"POST",headers:{"Content-Type":"application/json"},
     body:JSON.stringify(body)})).json());
 }
-const answer = (id,choice)=>post("/api/answer",{decision_id:id,choice});
+const answer = (id,choice)=>{ closeDecision(); return post("/api/answer",{decision_id:id,choice}); };
 const tick = ticks=>post("/api/tick",{ticks});
+
+// --- decision detail: the branches built while the question waited ---------
+let openId = null;
+function branchPaths(n){
+  // n curved paths diverging from one point on the left to evenly spread ends.
+  const W=560,H=Math.max(120,n*74),x0=8,y0=H/2,x1=W-8;
+  let out=`<svg viewBox="0 0 ${W} ${H}" width="100%" preserveAspectRatio="xMidYMid meet" aria-hidden="true">`;
+  for(let i=0;i<n;i++){
+    const y1=n===1?y0:(H/(n+1))*(i+1);
+    const bright = i===0;
+    out+=`<path d="M${x0} ${y0} C ${W*.42} ${y0}, ${W*.5} ${y1}, ${x1} ${y1}"
+      fill="none" stroke="${bright?'var(--line-strong)':'var(--line)'}"
+      stroke-width="${bright?1.6:1}"/>`;
+  }
+  out+=`<circle cx="${x0}" cy="${y0}" r="3.5" fill="var(--accent)"/></svg>`;
+  return out;
+}
+async function openDecision(id){
+  openId = id;
+  const d = await (await fetch("/api/decision?id="+encodeURIComponent(id))).json();
+  if (d.error){ closeDecision(); return; }
+  const bn = d.branches.length;
+  const state = b => b.chosen ? `<div class="b-state chosen">merged — already verified</div>`
+    : b.discarded ? `<div class="b-state gone">discarded when you chose</div>`
+    : `<div class="b-state">${b.verified}/${b.total} verified · waiting on your answer</div>`;
+  const work = b => b.work.map(w=>`
+    <div class="w"><span class="tick">${w.status==='done'?'✓':'·'}</span>
+      <div><div class="wt">${esc(w.title)}</div>
+        ${w.evidence?`<div class="we">${esc(w.evidence)}</div>`:''}</div></div>`).join("");
+
+  $("sheet").innerHTML = `
+    <button class="ghost icon close" onclick="closeDecision()" aria-label="Close">✕</button>
+    <div class="d-q">${esc(d.question)}</div>
+    <div class="d-id">${esc(d.id)}</div>
+    <div class="d-meta">unblocks ${d.unblocks} items · $${d.spent.toFixed(4)} spent building answers</div>
+    ${d.answer?`<div class="answered">✓ answered — ${esc(d.answer)}</div>`:''}
+
+    ${bn?`<div class="diagram">${branchPaths(bn)}</div>
+      <div class="dcap">Built while this question was open. Choosing an answer merges that branch immediately; the others are discarded. The waiting time was already spent doing the work.</div>
+      <div class="branches">${d.branches.map(b=>`
+        <div class="branch ${b.chosen?'chosen':''} ${b.discarded?'discarded':''}">
+          <div class="b-head"><div class="b-opt">${esc(b.option)}</div>
+            <div class="b-cost">$${b.cost.toFixed(4)}</div></div>
+          ${state(b)}
+          ${work(b)}
+        </div>`).join("")}</div>`
+      : `<div class="dcap" style="margin-top:22px">This question has no framed options yet, so nothing was speculated against it.</div>`}
+
+    ${!d.answer && d.options.length>=2 ? `<div class="d-opts">${d.options.map(o=>
+      `<button onclick="answer('${d.id}','${esc(o)}')">${esc(o)}</button>`).join("")}</div>`:''}
+
+    ${d.compressed_from.length>1?`<details class="folded"><summary>Compressed from ${d.compressed_from.length} escalations</summary>
+      <ul>${d.compressed_from.map(e=>`<li><span>${esc(e.id)}</span> · ${esc(e.title)}</li>`).join("")}</ul></details>`:''}`;
+  $("overlay").hidden = false;
+  document.body.style.overflow = "hidden";
+}
+function closeDecision(){
+  openId = null;
+  $("overlay").hidden = true;
+  document.body.style.overflow = "";
+}
+document.addEventListener("keydown", e=>{ if(e.key==="Escape") closeDecision(); });
 
 // Theme: dark is native. Respect a saved choice, else the OS, and let the
 // toggle override. localStorage may throw in some embeds, so guard it.
