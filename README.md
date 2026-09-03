@@ -2,273 +2,194 @@
 
 **A project manager for teams of humans and AI agents.**
 
-Every project tool ever built assumes labour is expensive and judgment is free.
-Agents inverted that. Labour is now cheap and parallel; judgment is not.
-Conductor spends the first to buy back the second.
+Describe a sprint once. Conductor turns it into a working team of people and
+agents, dispatches the work, verifies every result against a real check, and
+tracks all of it. It surfaces only when a decision needs a human.
 
-Built with the [Strands Agents SDK](https://strandsagents.com) on Amazon Bedrock,
-deployed to Bedrock AgentCore Runtime.
+Built with the **[Strands Agents SDK](https://strandsagents.com)** on Amazon
+Bedrock (with a Gemini provider path), and deployable to Amazon Bedrock
+AgentCore Runtime.
+
+**Track:** Professional Agents. **Live demo:** run `python serve.py` and open
+`http://127.0.0.1:7616` (see *Running it*).
 
 ---
 
 ## The problem
 
-Add AI agents to a team and output goes up sharply. So does a failure mode that
+Add AI agents to a team and output goes up sharply. So does a failure mode
 humans rarely produce: **an agent reports done, confidently, having produced
-something plausible and wrong.** It does not get tired, it gets confidently lost,
-and it never tells you.
+something plausible and wrong.** It does not get tired, it gets confidently
+lost, and it never tells you.
 
-Every tracker on the market records that as success, because completion is a
-status a worker sets. That was defensible when workers were people who feel
+Every project tracker records that as success, because completion is a status a
+worker sets. That was defensible when workers were people who feel
 embarrassment. It is not defensible now.
 
 So the bottleneck moves. It stops being *doing the work* and becomes *confirming
 the work is real*, and the scarce resource stops being engineering time and
 becomes human attention. No project tool models either.
 
+**Who it is for:** the engineer, founder, or small studio who now supervises AI
+coding agents and spends the day checking whether the agents' work is actually
+real.
+
 ## What Conductor does differently
 
-**Done is a claim, not a fact.** Every commitment declares, at plan time, the
-evidence that would prove it: a test that must pass, an endpoint that must
-respond, a file that must exist. The verification runner executes that check
-before status can reach `done`. A commitment with no evidence requirement fails
-closed, because an unverifiable task is a planning defect, not a free pass.
+The premise: labour is now cheap and parallel, judgment is not, so Conductor
+spends the first to buy back the second.
 
-**Human attention is the budgeted resource.** Dispatch is throttled by the
-reviewer's remaining review capacity, not by worker availability. Work nobody can
-check today is *held*, with the reason. Twelve agent tasks you cannot review by
-Friday is not throughput, it is debt with a friendly status colour.
+- **Done is a claim, not a fact.** Every commitment declares, at plan time, the
+  evidence that would prove it: a test that must pass, a file that must exist,
+  an endpoint that must respond. A verification runner executes that check
+  before status can reach `done`. A commitment with no evidence fails closed.
 
-**Waiting is optional.** When the project stalls on a decision only a person can
-make, the plan forks across every plausible answer and builds all of them in
-isolation overnight. When you answer, the chosen branch is not queued, it is
-already verified. The losers are discarded. In the seeded sprint that costs about
-24 cents and buys back a night.
+- **Human attention is the budgeted resource.** Dispatch is throttled by the
+  reviewer's remaining review capacity, not by worker availability. Work nobody
+  can check today is *held*, with the reason.
 
-**Nine escalations are usually two questions.** Escalations are clustered by the
-uncertainty behind them, asked once, and ranked by how much work each answer
-unblocks.
+- **Waiting is optional.** When the plan stalls on a decision only a person can
+  make, Conductor forks it across every plausible answer and builds them all in
+  isolation overnight. When you answer, the chosen branch is already verified;
+  the losers are discarded for a few cents.
 
-**Trust is earned and priced.** Verification depth is tracked per worker per kind
-of work, from outcomes only. It rises slowly and falls immediately, so the system
-verifies less as it learns more and snaps back to deep checks the moment a worker
-misses.
+- **Nine escalations are usually two questions.** Escalations are clustered by
+  the uncertainty behind them and ranked by how much work each answer unblocks.
 
-**The team is hired, not configured.** An agent teammate is declared as a job
-description and joins the board beside the people, on probation, with no trust.
-An agent can also act *for* a person: it inherits that principal's scopes, can
-never exceed them, and its output is reviewed by them. Delegation moves the
-labour, not the accountability.
+- **Trust is earned and priced.** Verification depth is tracked per worker per
+  kind of work, from outcomes only. It rises slowly and falls immediately.
+
+- **The team is hired, not configured.** Agents join the roster beside people,
+  on probation, and an agent can act *for* a person, inheriting their scopes and
+  never exceeding them.
+
+## Strands Agents
+
+Conductor is a Strands multi-agent system. Language models do judgment;
+deterministic code does consequence.
+
+| Agent (Strands) | Role |
+|---|---|
+| **Planner** | Turns intent into commitments that each carry their own evidence. `structured_output`. |
+| **Compressor** | Clusters escalations into root questions. |
+| **Recovery** | Diagnoses a failed check, and may rule the check itself wrong. |
+| **Orchestrator** | Agents-as-tools; reads board, queue, attention, trust. Cannot mark anything done. |
+| **StrandsWorker** | A real agent teammate, built from an `AgentSpec`, writing real code into a git worktree. |
+
+Deterministic and auditable (not agents): the verification runner, policy gate,
+attention ledger, trust ledger. **No agent can mark anything done** — the only
+path into `done` is the verification runner, and its verdict is not overridable.
 
 ## Architecture
 
-One line decides where every component lives: **language models do judgment,
-deterministic code does consequence.**
-
 ```
-ENTRYPOINT      AgentCore Runtime, async task — the loop runs between invocations
-    │
-JUDGMENT        Strands agents on Bedrock
-    │           Planner · Compressor · Recovery · Orchestrator
-    │           ✗ no agent can mark anything done
-    │ proposals only
-CONTROL LOOP    verify → recover → surface judgment → compress → speculate → dispatch
-    │           idempotent per tick, every change appended to an event log
-    ├── Verification runner    command · file · http · human review
-    ├── Attention ledger       dispatch capped by reviewer capacity
-    ├── Speculation engine     forks the plan across open decisions
-    ├── Decision surface       compressed, ranked by unblock value
-    ├── Trust ledger           earned slowly, lost at once
-    └── Cost ledger            priced per commitment, branch and decision
-    │
-POLICY GATE     AUTO / APPROVE / BLOCK on every action reaching the world
-    │           hard blocks: production · money · customer-facing speech
-ROSTER          hire() · probation · principal/scopes · elastic headcount
-EXECUTION       isolated branch per agent; nothing merges until evidence passes
-STATE           commitment graph, risk rescored every tick
+FRONTEND  React + TypeScript SPA (web/)               served at /, /product, /app ...
+  typed API client · landing · onboarding · 5 marketing pages · the app shell
+        │
+BACKEND   FastAPI ASGI service (conductor/asgi.py)     per-tenant · auth boundary · logging
+        │
+JUDGMENT  Strands agents on Bedrock/Gemini             Planner · Compressor · Recovery · Orchestrator
+        │ proposals only (no agent can mark done)
+LOOP      verify → recover → surface → compress → speculate → dispatch   (idempotent, event-sourced)
+        ├── verification runner   command · file · http · human review
+        ├── attention ledger      dispatch capped by reviewer capacity
+        ├── speculation engine    forks the plan across open decisions
+        ├── trust ledger          earned slowly, lost at once
+        └── cost ledger           priced per commitment, branch, decision
+        │
+GATE      policy engine           AUTO / APPROVE / BLOCK on every action to the world
+        │
+EXECUTION real git worktrees      nothing merges to base until evidence passes
+        │
+STATE     event-sourced graph     resumable · replayable · DynamoDB / JSONL / memory
 ```
 
 Full diagrams: [`docs/architecture.html`](docs/architecture.html).
 
-The one edge worth tracing is the one that does not exist: **there is no path from
-the judgment layer to `done`.** Agents propose, the loop dispatches, and only the
-verification runner can complete anything. Its verdict is not overridable by a
-model.
-
 ## Running it
+
+A stranger can run it cold, with no AWS and no API keys, via the deterministic
+demo. The engine is real; only the language model is swapped for a fixed worker.
 
 ```bash
 python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
 
-# the deterministic core, no AWS needed
-.venv/bin/python demo.py          # a seeded sprint, start to finish
-.venv/bin/python roster_demo.py   # hiring, delegation, scope inheritance
+# 1. The whole loop against a REAL git repo, no model, no network:
+.venv/bin/python real_demo.py
+
+# 2. A seeded sprint, start to finish, in the terminal:
+.venv/bin/python demo.py
+
+# 3. The tests (41 invariants):
 .venv/bin/python -m pytest tests/ -q
 ```
 
-The decision surface, which is the only part a person looks at:
+### The app (landing, onboarding, workspace, marketing pages)
 
 ```bash
-.venv/bin/python serve.py            # http://127.0.0.1:7616
+.venv/bin/python serve.py          # uvicorn on http://127.0.0.1:7616
 ```
 
-It shows what needs you, what is held and why, what each question unblocks and
-how many branches were already built against it, where the attention budget
-went, and what the run cost. On a good day it says "Nothing needs you."
+Open `http://127.0.0.1:7616`: the landing page, `/product` `/pricing`
+`/customers` `/now` `/contact` (public), `/signup` (onboarding), and `/app`
+(the workspace). Nothing runs until you drive it from the UI.
 
-For the Strands agents you need AWS credentials and Anthropic models enabled in
-Bedrock:
+### Live agents
+
+Conductor is model-agnostic (Strands). Bedrock is the default provider; set
+Gemini to run live agents on a working quota:
 
 ```bash
-aws configure --profile conductor     # region us-west-2
-.venv/bin/python check_aws.py         # preflight: identity, access, one real call
+echo 'GEMINI_API_KEY=your_key' > .env          # gitignored
+set -a && . ./.env && set +a
+CONDUCTOR_PROVIDER=gemini .venv/bin/python serve.py     # or: check_aws.py for Bedrock
 ```
 
-Conductor binds to a named profile on purpose and fails loudly rather than
-falling through to `default`, because it runs agents that write files and execute
-commands. Set `CONDUCTOR_AWS_PROFILE=""` to use ambient credentials deliberately,
-which is correct inside AgentCore Runtime where the task role is the right
-identity.
+Verified live end to end: a Strands worker wrote correct Python into a real git
+worktree, the evidence check passed, and the branch merged into the base.
+
+### Rebuilding the frontend
+
+The compiled `web/dist` is committed, so `serve.py` runs with no Node step. To
+change the UI:
+
+```bash
+cd web && npm install && npm run build
+```
 
 ## Deploying to production
 
-Conductor runs as an ASGI service (`conductor.asgi:app`) with per-tenant
-isolation, an auth boundary, durable state and request logging.
-
-```bash
-# local
-python serve.py                        # uvicorn on CONDUCTOR_HOST/PORT
-
-# durable + multi-tenant + enforced auth
-export CONDUCTOR_TABLE=conductor-events        # DynamoDB, or CONDUCTOR_EVENT_LOG=./state.jsonl
-export CONDUCTOR_REQUIRE_AUTH=1
-export CONDUCTOR_SESSION_SECRET=$(openssl rand -hex 32)
-python serve.py
-```
-
-Deployment artifacts are in `deploy/`:
-
-- `cloudformation.yaml` — the DynamoDB event table (partitioned by tenant,
-  sorted by sequence) and the task IAM role. `aws cloudformation deploy`.
-- `Dockerfile` — the ARM64 production image for AgentCore Runtime / Graviton.
-- `agentcore.yaml` — AgentCore CLI configuration.
+The service (`conductor.asgi:app`) has per-tenant isolation, an auth boundary,
+durable state and request logging. Artifacts are in `deploy/`:
 
 ```bash
 aws cloudformation deploy --template-file deploy/cloudformation.yaml \
-  --stack-name conductor --capabilities CAPABILITY_NAMED_IAM
+  --stack-name conductor --capabilities CAPABILITY_NAMED_IAM      # DynamoDB + task role
 npm install -g @aws/agentcore
 agentcore create --name Conductor --framework Strands --model-provider Bedrock
 agentcore deploy
-agentcore invoke '{"action":"state"}'
 ```
 
 `conductor/agentcore_entry.py` is the AgentCore Runtime handler; the loop keeps
 running between invocations via `async_task`. `.github/workflows/ci.yml` runs
 the test suite on every push.
 
-**Auth boundary.** `conductor/auth.py` verifies a signed session an identity
-provider establishes; it never handles credentials itself. The self-minted
-HS256 session is for self-hosting; a marked integration point swaps in
-Cognito/Auth0/Okta JWKS validation with no change to the rest of the app.
-
 ## Cost
 
-```bash
-npm install -g @aws/agentcore
-agentcore create --name Conductor --framework Strands --model-provider Bedrock
-agentcore dev
-agentcore deploy
-agentcore invoke '{"action": "state"}'
-```
+Cheap models do the volume, capable models do the judgment. On the seeded
+sprint, per-role model selection cut cost from **$0.41 to $0.14 per verified
+commitment** with planning quality unchanged. Prices in
+`conductor/models_config.py` are placeholders until measured against a bill.
 
-Actions: `state`, `tick`, `run`, `answer`, `plan`, `ask`.
+## Status (honest)
 
-## Model providers
-
-Strands is model-agnostic and so is Conductor. Bedrock is the default provider
-(`global.anthropic.claude-sonnet-4-6` for judgment, Haiku for workers). Set
-`CONDUCTOR_PROVIDER=gemini` with `GEMINI_API_KEY` to route every role to Gemini
-instead — Gemini 3.1 Pro for judgment, 3.5 Flash for workers — with no other
-change to the system. This was verified live end to end: a Gemini worker wrote
-correct Python into a real git worktree, the evidence check passed, and the
-branch merged into the base.
-
-## Real mode: agents work in git worktrees
-
-`real_demo.py` runs the whole loop against a real git repository with a
-deterministic code-writing worker, so the core guarantee is shown end to end
-with no model and no network:
-
-- each commitment's work runs in its own `git worktree` on its own branch
-- the evidence command runs inside that worktree
-- a pass merges the branch to the base with a real merge commit; a fail deletes
-  the worktree so wrong work never touches the base
-
-In the seeded backlog two tasks come back confident and wrong the first time
-(slugify forgets to lowercase; backoff is off by one). Both are caught by their
-checks and discarded before any human looks, recovery re-dispatches, and the
-retries pass. The base branch ends holding only the correct implementations,
-and every `conductor/*` worktree is cleaned up.
-
-`world.build(repo=...)` opens the loop in this mode against any repository. The
-live Strands worker writes into these same worktrees; the deterministic worker
-is the reproducible, throttle-free path used for the demo and tests.
-
-## Persistence and replay
-
-The loop is idempotent per tick, so the durable thing is not the graph, it is
-the sequence of facts that produced it. Every meaningful transition is appended
-to an event log: planned, hired, dispatched, held, claimed, verified, rejected,
-escalated, answered, speculated, discarded.
-
-```bash
-.venv/bin/python replay_demo.py
-```
-
-That runs a sprint, persists it, then rebuilds the entire graph from the log
-alone and checks the result against the live run. No workers run, no checks
-execute, no money is spent, and the reconstruction is exact.
-
-Three backends sit behind one interface: in-memory, JSONL, and DynamoDB
-partitioned by tenant and sorted by sequence, with a conditional write so a
-replayed tick cannot double-record a fact. Events carry a tenant, so one log
-holds many teams without the graph ever seeing another team's work.
-
-This buys three things Conductor specifically needs. The loop survives a restart
-mid-sprint. "Why is this done?" has an answer with a timestamp on it, which
-matters most for the one transition the whole product turns on. And a demo can
-replay a real run without dispatching live agents at it.
-
-## Cost
-
-Conductor deliberately spends compute to save attention, so the spending is
-measured rather than asserted. Models are selected per role: workers run on Haiku
-because they are the entire cost curve, judgment roles stay on Sonnet because
-writing a check whose failure is *meaningful* is the hardest call in the system.
-
-Measured on the seeded sprint, same run, only the model policy changed:
-
-| | all Sonnet | per-role |
-|---|---|---|
-| total | $2.0381 | **$0.6794** |
-| per verified commitment | $0.4076 | **$0.1359** |
-
-Two numbers matter more than the total: cost per *verified* commitment, which is
-what you actually got, and spend on *rejected* claims, which is what the
-verification layer saved you from reviewing by hand.
-
-Prices in `conductor/models_config.py` are placeholders until measured against a
-real bill.
-
-## Status
-
-Working: the state, execution, policy, roster and control-loop layers, with 22
-invariant tests. The seeded sprint runs end to end with real shell verification.
-
-Not yet exercised against Bedrock: the four Strands agents. Written against the
-verified SDK API, but no live model call has been made.
-
-Stubs: no board or chat adapters.
+- **Working:** the full engine (verification, attention, speculation, trust,
+  policy, roster, cost, event-sourced persistence, real git execution), the
+  React + TypeScript frontend, the FastAPI service, 41 invariant tests.
+- **Verified live on Gemini.** The Bedrock path is wired and correct; live
+  Bedrock calls are currently throttled by a new-account daily token quota.
+- **Prototype:** the sign-in flow collects no real credentials; auth enforcement
+  and the IdP integration point exist but are not wired to a live provider.
 
 ## Licence
 
