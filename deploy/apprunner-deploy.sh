@@ -30,12 +30,24 @@ echo "==> building + pushing linux/amd64 image  ${IMAGE}"
 docker buildx build --platform linux/amd64 -f deploy/Dockerfile \
   -t "$IMAGE" --push .
 
+# Live agents: if a Gemini key is present (in the env or .env), run the agents
+# live on Gemini. The key flows straight from .env into the service parameter;
+# it is never printed or committed.
+[ -f .env ] && set -a && . ./.env && set +a
+PARAMS="ImageUri=${IMAGE}"
+if [ -n "${GEMINI_API_KEY:-}" ]; then
+  echo "==> Gemini key found: deploying with live agents (provider=gemini, model=${CONDUCTOR_GEMINI_MODEL:-gemini-3.5-flash})"
+  PARAMS="$PARAMS Provider=gemini GeminiApiKey=${GEMINI_API_KEY} GeminiModel=${CONDUCTOR_GEMINI_MODEL:-gemini-3.5-flash}"
+else
+  echo "==> no Gemini key: deploying with the deterministic fixture planner"
+fi
+
 echo "==> deploying App Runner service (CloudFormation)"
 aws cloudformation deploy \
   --template-file deploy/apprunner.yaml \
   --stack-name conductor-web \
   --capabilities CAPABILITY_NAMED_IAM \
-  --parameter-overrides "ImageUri=${IMAGE}" \
+  --parameter-overrides $PARAMS \
   --region "$REGION"
 
 URL="$(aws cloudformation describe-stacks --stack-name conductor-web \

@@ -89,7 +89,10 @@ def _gemini(rm, temp):
     key = os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY")
     if not key:
         raise RuntimeError("CONDUCTOR_PROVIDER=gemini needs GEMINI_API_KEY set.")
-    gid = GEMINI_FOR_ROLE.get(rm.role, "gemini-3.5-flash")
+    # The pro judgment model needs paid quota; a key on the free tier only has
+    # flash. CONDUCTOR_GEMINI_MODEL forces every role onto one model so a
+    # deployment can run live within whatever quota the key actually has.
+    gid = os.environ.get("CONDUCTOR_GEMINI_MODEL") or GEMINI_FOR_ROLE.get(rm.role, "gemini-3.5-flash")
     m = GeminiModel(client_args={"api_key": key}, model_id=gid,
                     params={"temperature": temp})
     m.conductor_model_id = gid

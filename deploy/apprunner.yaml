@@ -6,6 +6,21 @@ Parameters:
   ImageUri:
     Type: String
     Description: ECR image URI (with tag) for the conductor web image.
+  Provider:
+    Type: String
+    Default: bedrock
+    AllowedValues: [bedrock, gemini]
+    Description: LLM provider for the live agents.
+  GeminiApiKey:
+    Type: String
+    Default: ""
+    NoEcho: true
+    Description: Gemini API key, used only when Provider=gemini. Passed at deploy
+      time from the operator's .env; never stored in the repo.
+  GeminiModel:
+    Type: String
+    Default: gemini-3.5-flash
+    Description: Force every Gemini role onto one model (free-tier keys only have flash).
 
 Resources:
   # App Runner assumes this role to pull the image from ECR.
@@ -53,6 +68,12 @@ Resources:
                 Value: ""                  # no local profile in the cloud
               - Name: CONDUCTOR_WORK_DIR
                 Value: "/tmp/conductor-work"
+              - Name: CONDUCTOR_PROVIDER
+                Value: !Ref Provider
+              - Name: CONDUCTOR_GEMINI_MODEL
+                Value: !Ref GeminiModel
+              - Name: GEMINI_API_KEY
+                Value: !Ref GeminiApiKey
       InstanceConfiguration:
         Cpu: "1024"                        # 1 vCPU
         Memory: "2048"                     # 2 GB
