@@ -63,8 +63,37 @@ h1{font-size:clamp(40px,6.5vw,72px);font-weight:600;letter-spacing:-.032em;line-
   background:var(--surface);overflow:hidden;box-shadow:0 40px 120px rgba(0,0,0,.5)}
 .frame .bar{display:flex;align-items:center;gap:7px;padding:12px 16px;border-bottom:1px solid var(--line)}
 .frame .bar i{width:11px;height:11px;border-radius:50%;background:var(--e3);display:block}
-.shot{display:block;width:100%;height:auto}
-.shot-fallback{padding:60px 24px;text-align:center;color:var(--t3);font-family:var(--mono);font-size:13px}
+.frame .bar{position:relative}
+.livedot{width:7px;height:7px;border-radius:50%;background:var(--pass);margin-left:auto;
+  box-shadow:0 0 0 0 rgba(63,214,138,.5);animation:lpulse 2.2s ease-out infinite}
+.livelabel{font-family:var(--mono);font-size:10px;letter-spacing:.1em;text-transform:uppercase;
+  color:var(--t3);margin-left:2px}
+@keyframes lpulse{0%{box-shadow:0 0 0 0 rgba(63,214,138,.45)}70%{box-shadow:0 0 0 7px rgba(63,214,138,0)}100%{box-shadow:0 0 0 0 rgba(63,214,138,0)}}
+/* self-running mini control room */
+.stage{padding:26px 26px 30px;min-height:360px}
+.stage-head{display:flex;justify-content:space-between;align-items:flex-start;gap:20px;
+  padding-bottom:22px;border-bottom:1px solid var(--line);flex-wrap:wrap}
+.stage-title{font-size:26px;font-weight:600;letter-spacing:-.02em;line-height:1.1}
+.stage-figs{display:flex;gap:26px}
+.sf{text-align:right}
+.sf b{font-family:var(--mono);font-size:26px;font-weight:500;letter-spacing:-.02em;display:block}
+.sf b.fail{color:var(--fail)} .sf b.held{color:var(--held)}
+.sf span{font-family:var(--mono);font-size:9.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--t3)}
+.stage-rows{margin-top:8px}
+.srow{display:grid;grid-template-columns:96px 1fr auto;gap:12px;align-items:center;
+  padding:12px 2px;border-bottom:1px solid var(--line);opacity:0;transform:translateY(6px);
+  transition:opacity .4s,transform .4s,background .4s;border-radius:6px}
+.srow.in{opacity:1;transform:none}
+.srow.flash{background:var(--fail-wash)}
+.schip{font-family:var(--mono);font-size:9.5px;letter-spacing:.05em;text-transform:uppercase;
+  padding:3px 9px;border-radius:9999px;justify-self:start;transition:.3s}
+.s-run{color:var(--accent);background:rgba(111,127,240,.10)}
+.s-fail{color:var(--fail);background:var(--fail-bg)}
+.s-done{color:var(--pass);background:var(--pass-bg)}
+.s-held{color:var(--held);background:var(--held-bg)}
+.stitle{font-size:13.5px;font-weight:500}
+.swhy{font-family:var(--mono);font-size:10.5px;color:var(--t3);margin-top:3px;min-height:12px}
+.sright{font-family:var(--mono);font-size:10.5px;color:var(--t3);white-space:nowrap}
 
 /* the claim */
 .claim{padding:110px 0 40px;text-align:center}
@@ -140,7 +169,6 @@ footer .mono{font-size:12px}
 </div></div></nav>
 
 <header class="hero"><div class="glow"></div><div class="wrap">
-  <div class="eyebrow"><span class="dot"></span> Built on Strands Agents + Amazon Bedrock</div>
   <h1>The project manager for humans and agents.</h1>
   <p class="sub">Agents made work cheap and parallel. They also lie — confidently reporting done
     on work that is plausible and wrong. Conductor verifies every claim, budgets your attention,
@@ -152,9 +180,21 @@ footer .mono{font-size:12px}
   <div class="trust">No card. The demo runs on synthetic data, no sign-in needed.</div>
 
   <div class="frame">
-    <div class="bar"><i></i><i></i><i></i></div>
-    <img class="shot" src="/shot/app-home.png" alt="Conductor control room"
-      onerror="this.replaceWith(Object.assign(document.createElement('div'),{className:'shot-fallback',textContent:'the live product →'}))">
+    <div class="bar">
+      <i></i><i></i><i></i>
+      <span class="livedot"></span><span class="livelabel">loop running</span>
+    </div>
+    <div class="stage" id="stage">
+      <div class="stage-head">
+        <div class="stage-title" id="stageTitle">One thing needs you.</div>
+        <div class="stage-figs">
+          <div class="sf"><b class="fail" id="figCaught">0</b><span>caught wrong</span></div>
+          <div class="sf"><b id="figVer">0</b><span>verified</span></div>
+          <div class="sf"><b class="held" id="figHeld">0</b><span>held</span></div>
+        </div>
+      </div>
+      <div class="stage-rows" id="stageRows"></div>
+    </div>
   </div>
 </div></header>
 
@@ -194,7 +234,7 @@ footer .mono{font-size:12px}
 
 <footer><div class="wrap" style="display:flex;justify-content:space-between;width:100%;flex-wrap:wrap;gap:12px">
   <span>Conductor</span>
-  <span class="mono">Strands Agents · Amazon Bedrock · AgentCore</span>
+  <span class="mono">humans + agents, one team</span>
 </div></footer>
 
 <div class="overlay" id="auth" hidden onclick="if(event.target===this)closeAuth()">
@@ -238,4 +278,74 @@ function enter(){
 }
 document.addEventListener("keydown",e=>{ if(e.key==="Escape") closeAuth(); });
 (function(){ const m=new URLSearchParams(location.search).get("auth"); if(m) openAuth(m); })();
+
+// --- self-running mini control room: the loop catching a bad claim ---------
+(function stage(){
+  const rowsEl = document.getElementById("stageRows");
+  if (!rowsEl) return;
+  const sleep = ms => new Promise(r=>setTimeout(r, ms));
+  const setFig = (id, v) => { const e=document.getElementById(id); if(e) e.textContent=v; };
+  let caught=0, verified=0, held=0;
+
+  const script = [
+    {t:"Fix the payment webhook retry", chip:"s-done", label:"done", why:"grep -q RETRY_OK webhook.txt · passed", right:"impl-agent"},
+    {t:"Migrate the onboarding events table", chip:"s-held", label:"held", why:"reviewer has 0m left · waiting", right:"25m"},
+    {t:"Implement slugify(text)", chip:"bad", label:"", why:"", right:"impl-agent"},
+    {t:"Competitive research on three tools", chip:"s-done", label:"done", why:"research.txt · passed", right:"research-agent"},
+  ];
+
+  function mkRow(){
+    const r=document.createElement("div"); r.className="srow";
+    r.innerHTML=`<span class="schip s-run">dispatched</span>
+      <div><div class="stitle"></div><div class="swhy"></div></div><span class="sright"></span>`;
+    rowsEl.appendChild(r); requestAnimationFrame(()=>r.classList.add("in")); return r;
+  }
+  const set=(r,chip,label,title,why,right)=>{
+    r.querySelector(".schip").className="schip "+chip;
+    r.querySelector(".schip").textContent=label;
+    r.querySelector(".stitle").textContent=title;
+    r.querySelector(".swhy").textContent=why;
+    r.querySelector(".sright").textContent=right;
+  };
+
+  async function run(){
+    rowsEl.innerHTML=""; caught=verified=held=0;
+    setFig("figCaught",0); setFig("figVer",0); setFig("figHeld",0);
+    setFig("stageTitle","One thing needs you.");
+    for (const item of script){
+      const r=mkRow(); set(r,"s-run","dispatched",item.t,"agent working…",item.right);
+      await sleep(700);
+      if (item.chip==="bad"){
+        // confident, wrong → caught → retry → verified
+        set(r,"s-run","dispatched",item.t,"agent reports complete",item.right);
+        await sleep(650);
+        r.classList.add("flash");
+        set(r,"s-fail","rejected",item.t,"assert failed · not lowercased — caught",item.right);
+        caught++; setFig("figCaught",caught);
+        await sleep(950); r.classList.remove("flash");
+        set(r,"s-run","retry",item.t,"re-dispatched with the failure",item.right);
+        await sleep(750);
+        set(r,"s-done","done",item.t,"slugify('Hello World')=='hello-world' · passed",item.right);
+        verified++; setFig("figVer",verified);
+      } else if (item.chip==="s-held"){
+        set(r,item.chip,item.label,item.t,item.why,item.right); held++; setFig("figHeld",held);
+      } else {
+        set(r,item.chip,item.label,item.t,item.why,item.right); verified++; setFig("figVer",verified);
+      }
+      await sleep(500);
+    }
+    setFig("stageTitle","Nothing needs you.");
+    await sleep(2600);
+    run();
+  }
+  // start when the frame scrolls into view (and respect reduced motion)
+  if (matchMedia("(prefers-reduced-motion: reduce)").matches){
+    setFig("figCaught",1); setFig("figVer",3); setFig("figHeld",1);
+    setFig("stageTitle","Nothing needs you.");
+    ["Fix the payment webhook retry","Implement slugify(text)","Competitive research on three tools"]
+      .forEach(t=>{}); return;
+  }
+  const io=new IntersectionObserver(es=>{ if(es[0].isIntersecting){ io.disconnect(); run(); }});
+  io.observe(rowsEl);
+})();
 </script>
