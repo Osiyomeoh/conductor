@@ -20,6 +20,12 @@ DEFAULT_REGION = os.environ.get("CONDUCTOR_REGION", "us-west-2")
 # rather than silently falling through to `default`.
 PROFILE = os.environ.get("CONDUCTOR_AWS_PROFILE", "conductor")
 
+# Strands is model-agnostic. Bedrock is the intended provider for the AWS story,
+# but when its token quota is starved a different provider gets a live agent
+# running immediately. Set CONDUCTOR_PROVIDER=gemini (with GEMINI_API_KEY) to
+# route every role to Gemini instead. The rest of the system does not change.
+PROVIDER = os.environ.get("CONDUCTOR_PROVIDER", "bedrock").lower()
+
 
 def strands_available() -> bool:
     try:
@@ -48,22 +54,43 @@ def session():
 
 def model(role: str = "orchestrator", override: str | None = None,
           temperature: float | None = None):
-    """Bedrock-backed model for a role, bound to the Conductor profile.
+    """A model for a role, on the configured provider.
 
     Cheap models do the volume, capable models do the judgment. Returns the
-    model plus its resolved id, so cost accounting prices what actually ran
-    rather than what the default said.
+    model tagged with its resolved id, so cost accounting prices what actually
+    ran rather than what the default said.
     """
-    from strands.models import BedrockModel
-
     from ..models_config import for_role
     rm = for_role(role, override)
     temp = rm.temperature if temperature is None else temperature
+
+    if PROVIDER == "gemini":
+        return _gemini(rm, temp)
+    return _bedrock(rm, temp)
+
+
+def _bedrock(rm, temp):
+    from strands.models import BedrockModel
     try:
-        m = BedrockModel(model_id=rm.model_id, boto_session=session(),
-                         temperature=temp)
+        m = BedrockModel(model_id=rm.model_id, boto_session=session(), temperature=temp)
     except TypeError:
         m = BedrockModel(boto_session=session(),
                          model_config={"model_id": rm.model_id, "temperature": temp})
     m.conductor_model_id = rm.model_id
+    return m
+
+
+def _gemini(rm, temp):
+    """Gemini via Strands' native provider. The role's Bedrock model id is
+    mapped to a Gemini equivalent: cheap for workers, capable for judgment."""
+    from strands.models.gemini import GeminiModel
+
+    from ..models_config import GEMINI_FOR_ROLE
+    key = os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY")
+    if not key:
+        raise RuntimeError("CONDUCTOR_PROVIDER=gemini needs GEMINI_API_KEY set.")
+    gid = GEMINI_FOR_ROLE.get(rm.role, "gemini-3.5-flash")
+    m = GeminiModel(client_args={"api_key": key}, model_id=gid,
+                    params={"temperature": temp})
+    m.conductor_model_id = gid
     return m

@@ -142,6 +142,16 @@ agentcore invoke '{"action": "state"}'
 
 Actions: `state`, `tick`, `run`, `answer`, `plan`, `ask`.
 
+## Model providers
+
+Strands is model-agnostic and so is Conductor. Bedrock is the default provider
+(`global.anthropic.claude-sonnet-4-6` for judgment, Haiku for workers). Set
+`CONDUCTOR_PROVIDER=gemini` with `GEMINI_API_KEY` to route every role to Gemini
+instead — Gemini 3.1 Pro for judgment, 3.5 Flash for workers — with no other
+change to the system. This was verified live end to end: a Gemini worker wrote
+correct Python into a real git worktree, the evidence check passed, and the
+branch merged into the base.
+
 ## Real mode: agents work in git worktrees
 
 `real_demo.py` runs the whole loop against a real git repository with a

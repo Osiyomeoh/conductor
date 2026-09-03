@@ -24,6 +24,21 @@ from __future__ import annotations
 import os
 from dataclasses import dataclass
 
+# Gemini equivalents per role: Flash for volume, Pro for judgment. Used when
+# CONDUCTOR_PROVIDER=gemini. Prices below are Bedrock's; Gemini spend shows as
+# its own model ids in the ledger and is priced separately when it matters.
+GEMINI_FOR_ROLE = {
+    "planner": "gemini-3.1-pro-preview",
+    "recovery": "gemini-3.1-pro-preview",
+    "compressor": "gemini-3.1-pro-preview",
+    "orchestrator": "gemini-3.1-pro-preview",
+    "worker": "gemini-3.5-flash",
+}
+GEMINI_PRICES = {
+    "gemini-3.5-flash": (0.30, 2.50),
+    "gemini-3.1-pro-preview": (1.25, 10.00),
+}
+
 SONNET = "global.anthropic.claude-sonnet-4-6"
 HAIKU = "us.anthropic.claude-haiku-4-5-20251001-v1:0"
 
@@ -33,6 +48,8 @@ PRICES: dict[str, tuple[float, float]] = {
     HAIKU: (1.00, 5.00),
     "default": (3.00, 15.00),
 }
+
+PRICES.update(GEMINI_PRICES)
 
 ROLE_DEFAULTS: dict[str, str] = {
     "planner": SONNET,
