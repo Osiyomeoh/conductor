@@ -225,3 +225,4 @@ footer .mono{font-size:12px}
 .foot-menu .col a:hover{color:var(--t1)}
 .foot-bottom{border-top:1px solid var(--line);padding:22px 0;display:flex;justify-content:space-between;
   flex-wrap:wrap;gap:12px;color:var(--t3);font-size:13px}
+.mark .glyph{width:72%;height:72%;display:block}

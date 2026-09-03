@@ -1,5 +1,6 @@
 import { useState } from "react";
 import "./onboarding.css";
+import { Glyph } from "./logo";
 
 const G = <svg width="15" height="15" viewBox="0 0 24 24"><path fill="#fff" d="M23 12.3c0-.8-.1-1.6-.2-2.3H12v4.5h6.2a5.3 5.3 0 0 1-2.3 3.5v2.9h3.7c2.2-2 3.4-5 3.4-8.6z" /><path fill="#fff" opacity=".8" d="M12 24c3.1 0 5.7-1 7.6-2.8l-3.7-2.9c-1 .7-2.3 1.1-3.9 1.1-3 0-5.5-2-6.4-4.7H1.8v3C3.7 21.4 7.5 24 12 24z" /></svg>;
 const GH = <svg width="15" height="15" viewBox="0 0 24 24" fill="#fff"><path d="M12 .5A11.5 11.5 0 0 0 .5 12a11.5 11.5 0 0 0 7.9 10.9c.6.1.8-.2.8-.5v-2c-3.2.7-3.9-1.4-3.9-1.4-.5-1.3-1.3-1.7-1.3-1.7-1-.7.1-.7.1-.7 1.2.1 1.8 1.2 1.8 1.2 1 1.8 2.8 1.3 3.5 1 .1-.8.4-1.3.7-1.6-2.6-.3-5.3-1.3-5.3-5.7 0-1.3.4-2.3 1.2-3.1-.1-.3-.5-1.5.1-3.1 0 0 1-.3 3.3 1.2a11.5 11.5 0 0 1 6 0C17 4.6 18 4.9 18 4.9c.6 1.6.2 2.8.1 3.1.8.8 1.2 1.8 1.2 3.1 0 4.4-2.7 5.4-5.3 5.7.4.4.8 1.1.8 2.2v3.3c0 .3.2.6.8.5A11.5 11.5 0 0 0 23.5 12 11.5 11.5 0 0 0 12 .5z" /></svg>;
@@ -55,7 +56,7 @@ export function Onboarding({ go }: { go: (path: string) => void }) {
   return (
     <div className="split">
       <div className="left">
-        <div className="brand"><span className="mark">C</span> Conductor</div>
+        <div className="brand"><span className="mark"><span className="glyph"><Glyph /></span></span> Conductor</div>
         <div className="formwrap">
           <div className="step" key={i}>
             <h1>{s.title}</h1><p className="lede">{s.lede}</p>

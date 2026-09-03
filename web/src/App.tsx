@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { useConductor, useTheme } from "./hooks";
+import { Glyph } from "./logo";
 import { BoardView, CostView, DecisionsView, DecisionOverlay, HomeView, PlanOverlay, TeamView } from "./views";
 
 type ViewName = "home" | "board" | "decisions" | "team" | "cost";
@@ -30,7 +31,7 @@ export function App() {
   return (
     <div className="app">
       <aside className="sidebar">
-        <div className="ws"><span className="mark">C</span><span>Conductor</span></div>
+        <div className="ws"><span className="mark"><span className="glyph"><Glyph /></span></span><span>Conductor</span></div>
         <div className="navlabel">Workspace</div>
         {NAV.map((x) => (
           <button key={x.view} className={`nav ${view === x.view ? "active" : ""}`} onClick={() => go(x.view)}>

@@ -94,4 +94,4 @@ body{background:var(--ground);color:var(--t1);font-family:var(--sans);font-size:
 .pc-held{color:var(--held);background:rgba(247,191,139,.10)}
 .pt{font-size:12.5px;font-weight:500}
 .pw{font-family:var(--mono);font-size:10px;color:var(--t3);margin-top:2px}
-@media(prefers-reduced-motion:reduce){.plive .d{animation:none}}
+@media(prefers-reduced-motion:reduce){.plive .d{animation:none}}.mark .glyph{width:72%;height:72%;display:block}

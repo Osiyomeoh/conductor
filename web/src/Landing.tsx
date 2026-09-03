@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import "./landing.css";
+import { Glyph } from "./logo";
 
 type Row = { chip: string; label: string; title: string; why: string; right: string };
 const SCRIPT: Row[] = [
@@ -70,7 +71,7 @@ export function Landing({ go }: { go: (path: string) => void }) {
   return (
     <div className="landing">
       <nav className="nav"><div className="wrap"><div className="row">
-        <div className="brand"><span className="mark">C</span> Conductor</div>
+        <div className="brand"><span className="mark"><span className="glyph"><Glyph /></span></span> Conductor</div>
         <div className="navmenu">
           <div className="item">
             <button>Product <svg className="caret" viewBox="0 0 12 12"><path d="M3 5l3 3 3-3" stroke="currentColor" strokeWidth="1.4" fill="none" /></svg></button>
@@ -209,7 +210,7 @@ export function Landing({ go }: { go: (path: string) => void }) {
       <footer className="foot-menu"><div className="wrap">
         <div className="cols">
           <div className="brandcol">
-            <div className="b"><span className="mark">C</span> Conductor</div>
+            <div className="b"><span className="mark"><span className="glyph"><Glyph /></span></span> Conductor</div>
             <p>The project manager for humans and agents. Verify every claim, budget your attention.</p>
           </div>
           <div className="col"><h5>Product</h5>
