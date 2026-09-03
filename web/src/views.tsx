@@ -189,6 +189,76 @@ export function ActivityView() {
   </>);
 }
 
+export function RealView() {
+  const [s, setS] = useState<import("./types").RealState | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [live, setLive] = useState(false);
+  useEffect(() => { void api.realState().then(setS).catch(() => {}); }, []);
+
+  const run = async () => {
+    setBusy(true);
+    try { setS(await api.realRun(8, live)); } finally { setBusy(false); }
+  };
+  const reset = async () => {
+    setBusy(true);
+    try { setS(await api.realReset(live)); } finally { setBusy(false); }
+  };
+
+  const m = s?.metrics;
+  return (<>
+    <Head title="Real execution" sub="real git worktrees · real checks · only verified code merges"
+      actions={<>
+        <label className="livetog"><input type="checkbox" checked={live}
+          onChange={(e) => setLive(e.target.checked)} /> live agent</label>
+        <button className="b" onClick={() => void reset()} disabled={busy}>Reset</button>
+        <button className="b primary" onClick={() => void run()} disabled={busy}>
+          {busy ? "Running…" : "Run on a real repo"}</button>
+      </>} />
+    <div className="vbody"><div className="vwrap">
+      <div className="realnote">
+        Every task runs in its own git worktree off the base branch. The check runs
+        as a real command inside that worktree. A pass merges; a failure is discarded
+        and re-dispatched. {live ? "The code is written by a live Strands agent." : "Turn on ‘live agent’ to have a Strands agent write the code; off, a deterministic worker plants a confident bug so you can watch it get caught."}
+      </div>
+
+      {m && (
+        <div className="realfigs">
+          <div className="fig fail"><div className="n">{m.claims_rejected}</div><div className="l">caught before merge</div></div>
+          <div className="fig pass"><div className="n">{m.verified}</div><div className="l">verified &amp; merged</div></div>
+          <div className="fig ink"><div className="n">{s?.in_flight ?? 0}</div><div className="l">in flight</div></div>
+        </div>
+      )}
+
+      <div className="realgrid">
+        <div className="section">
+          <div className="label">Base branch history {s?.repo?.path && <span className="mono dim">· {s.repo.path}</span>}</div>
+          <div className="gitlog card">
+            {(s?.repo?.log ?? []).map((ln, i) => {
+              const merge = ln.includes("conductor: merge");
+              return <div className={`gitline ${merge ? "merge" : ""}`} key={i}>
+                <span className="mono">{ln}</span></div>;
+            })}
+            {(!s?.repo?.log || s.repo.log.length === 0) &&
+              <div className="note" style={{ padding: 16 }}>No commits yet. Run it.</div>}
+          </div>
+        </div>
+
+        <div className="section">
+          <div className="label">Verified code on the base <span className="dim">(only passing work is here)</span></div>
+          {Object.entries(s?.repo?.files ?? {}).map(([name, body]) => (
+            <div className="filecard card" key={name}>
+              <div className="filename mono">{name}</div>
+              <pre className="filebody mono">{body}</pre>
+            </div>
+          ))}
+          {Object.keys(s?.repo?.files ?? {}).length === 0 &&
+            <div className="card"><div className="note" style={{ padding: 16 }}>Nothing merged yet.</div></div>}
+        </div>
+      </div>
+    </div></div>
+  </>);
+}
+
 export function TeamView() {
   const [t, setT] = useState<Team | null>(null);
   useEffect(() => { void api.team().then(setT); }, []);

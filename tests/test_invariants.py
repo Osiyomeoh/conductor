@@ -608,6 +608,24 @@ def test_asgi_health_and_demo_mode(monkeypatch):
     assert r.status_code == 200 and "x-request-id" in r.headers
 
 
+def test_asgi_real_execution_merges_only_verified(monkeypatch):
+    """The real-execution endpoint runs the loop against a real git repo and
+    merges only work whose real check passed. The confident-but-wrong slugify is
+    caught, so the version on the base branch is the correct, lowercased one."""
+    monkeypatch.setenv("CONDUCTOR_REQUIRE_AUTH", "0")
+    c, _ = _client()
+    r = c.post("/api/real/run", json={"ticks": 10, "live": False})
+    assert r.status_code == 200
+    d = r.json()
+    assert d["metrics"]["claims_rejected"] >= 1               # a lie was caught
+    assert d["metrics"]["verified"] >= 1
+    slug = d["repo"]["files"].get("slugify.py", "")
+    assert "lower()" in slug                                   # only the fixed one merged
+    assert any("merge" in ln for ln in d["repo"]["log"])       # real merge commits
+    # An unknown decision is a 404, not a 200 with an error body.
+    assert c.get("/api/decision?id=nope").status_code == 404
+
+
 def test_asgi_enforced_auth_and_tenant_isolation(monkeypatch):
     monkeypatch.setenv("CONDUCTOR_REQUIRE_AUTH", "1")
     monkeypatch.setenv("CONDUCTOR_SESSION_SECRET", "test-secret")

@@ -100,6 +100,17 @@ export interface Plan {
   assumptions: string[];
 }
 
+export interface RepoSnapshot {
+  base: string;
+  log: string[];
+  files: Record<string, string>;
+  path: string | null;
+}
+export interface RealState extends State {
+  repo: RepoSnapshot;
+  live?: boolean;
+}
+
 export interface ActivityEvent {
   seq: number; at: string; kind: string; tone: string; verb: string;
   actor: string | null; title: string | null; detail: string;

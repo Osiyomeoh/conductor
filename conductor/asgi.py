@@ -100,6 +100,64 @@ def api_decision(id: str, p: Principal = Depends(caller)):
     return detail
 
 
+# --- real execution -------------------------------------------------------
+# A single real-repo conductor, built lazily against an isolated temp repo. It
+# runs the fixed coding backlog (not arbitrary caller input, which on a public
+# endpoint would be remote code execution) in real git worktrees, verified by
+# real commands, merged only when the check passes.
+import shutil
+import tempfile
+
+_real_lock = __import__("threading").RLock()
+_real: dict = {"c": None, "repo": None, "live": None}
+
+
+def _real_conductor(live: bool):
+    from .realworld import build as build_real
+    if _real["c"] is None or _real["live"] != live:
+        if _real["repo"]:
+            shutil.rmtree(_real["repo"], ignore_errors=True)
+        _real["repo"] = tempfile.mkdtemp(prefix="conductor-real-")
+        _real["c"] = build_real(_real["repo"], live=live)
+        _real["live"] = live
+    return _real["c"]
+
+
+@app.get("/api/real/state")
+def api_real_state(p: Principal = Depends(caller)):
+    from .server import real_state
+    with _real_lock:
+        return real_state(_real_conductor(_real["live"] or False))
+
+
+@app.post("/api/real/run")
+async def api_real_run(request: Request, p: Principal = Depends(caller)):
+    from .planning import live_available
+    from .server import real_state
+    body = await _json(request)
+    ticks = max(1, min(12, int(body.get("ticks", 8))))
+    live = bool(body.get("live", False)) and live_available()
+    with _real_lock:
+        c = _real_conductor(live)
+        c.run(ticks=ticks)
+        s = real_state(c)
+        s["live"] = live
+        return s
+
+
+@app.post("/api/real/reset")
+async def api_real_reset(request: Request, p: Principal = Depends(caller)):
+    from .planning import live_available
+    from .server import real_state
+    body = await _json(request)
+    live = bool(body.get("live", False)) and live_available()
+    with _real_lock:
+        if _real["repo"]:
+            shutil.rmtree(_real["repo"], ignore_errors=True)
+        _real["c"] = None
+        return real_state(_real_conductor(live))
+
+
 @app.post("/api/reset")
 def api_reset(p: Principal = Depends(caller)):
     """Rebuild this tenant from a fresh seed. The guided demo calls this so a

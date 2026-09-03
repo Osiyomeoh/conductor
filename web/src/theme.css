@@ -212,3 +212,24 @@ button.b.primary{background:var(--accent);border-color:var(--accent);color:#0419
 .stitle2{font-size:13.5px;color:var(--t1)}
 .tone-fail .sverb{color:var(--fail)} .tone-pass .sverb{color:var(--pass)}
 .sdetail{font-size:11px;color:var(--t3);margin-top:3px;word-break:break-word}
+
+/* real execution view */
+.livetog{display:inline-flex;align-items:center;gap:6px;font-size:12.5px;color:var(--t2);
+  cursor:pointer;user-select:none}
+.livetog input{accent-color:var(--accent);width:14px;height:14px}
+.realnote{font-size:13px;color:var(--t2);line-height:1.55;max-width:760px;margin-bottom:22px}
+.realfigs{display:flex;gap:44px;margin-bottom:30px}
+.realfigs .fig .l{font-family:var(--mono);font-size:11px;letter-spacing:.09em;color:var(--t3);
+  margin-top:8px;text-transform:uppercase}
+.realgrid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:30px}
+@media(max-width:900px){.realgrid{grid-template-columns:1fr}}
+.gitlog{padding:8px 4px}
+.gitline{padding:5px 14px;font-size:12px;color:var(--t2);border-radius:6px}
+.gitline.merge{color:var(--pass)}
+.gitline.merge .mono{font-weight:500}
+.filecard{margin-bottom:14px;overflow:hidden}
+.filename{font-size:12px;color:var(--t1);padding:9px 14px;border-bottom:1px solid var(--line);
+  background:var(--e2);border-radius:12px 12px 0 0}
+.filebody{margin:0;padding:12px 14px;font-size:12px;line-height:1.5;color:var(--t1);
+  white-space:pre-wrap;overflow-x:auto}
+.dim{color:var(--t3)}

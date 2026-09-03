@@ -1,4 +1,4 @@
-import type { State, Team, DecisionDetail, Plan, Activity } from "./types";
+import type { State, Team, DecisionDetail, Plan, Activity, RealState } from "./types";
 
 // Thin typed client. Every call returns a typed promise, so a view that reads
 // a field the API does not send fails to compile.
@@ -27,4 +27,7 @@ export const api = {
   tick: (ticks: number) => post<State>("/api/tick", { ticks }),
   answer: (decision_id: string, choice: string) =>
     post<State>("/api/answer", { decision_id, choice }),
+  realState: () => get<RealState>("/api/real/state"),
+  realRun: (ticks: number, live: boolean) => post<RealState>("/api/real/run", { ticks, live }),
+  realReset: (live: boolean) => post<RealState>("/api/real/reset", { live }),
 };

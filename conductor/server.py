@@ -92,6 +92,38 @@ def state(c) -> dict:
     }
 
 
+def repo_snapshot(c) -> dict:
+    """The real git artifacts behind a real-execution run: the base branch's
+    merge log, and the source files that actually live on the base. Only
+    verified work is here, because only a passing branch was ever merged."""
+    ex = getattr(c, "executor", None)
+    repo = getattr(ex, "repo", None)
+    log_lines = []
+    files = {}
+    if ex is not None:
+        try:
+            log_lines = ex.base_log(20)
+        except Exception:  # noqa: BLE001
+            log_lines = []
+    if repo and os.path.isdir(repo):
+        for name in sorted(os.listdir(repo)):
+            if name.endswith(".py") and os.path.isfile(os.path.join(repo, name)):
+                try:
+                    with open(os.path.join(repo, name)) as f:
+                        files[name] = f.read()[:2000]
+                except OSError:
+                    pass
+    return {"base": getattr(ex, "base", "main"), "log": log_lines, "files": files,
+            "path": os.path.basename(repo) if repo else None}
+
+
+def real_state(c) -> dict:
+    """state(), plus the real repository snapshot, for the real-execution view."""
+    s = state(c)
+    s["repo"] = repo_snapshot(c)
+    return s
+
+
 def activity(c, limit: int = 120) -> dict:
     """The agent activity stream: every meaningful action, attributed to the
     worker that took it, read from the durable event log. This is Conductor's

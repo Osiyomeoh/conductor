@@ -39,3 +39,14 @@ Every verify, catch, merge and hold, in order, attributed to the worker.
 
 ## App — Cost & trust
 ![Cost and trust](../shots/apprunner-app-cost.png)
+
+## App — Real execution (real git, real checks)
+![Real execution](../shots/apprunner-real-exec.png)
+
+Not a simulation of the guarantee, the guarantee itself: each task runs in its
+own git worktree, the check runs as a real command, and only a branch that
+passes is merged. The base branch's history shows real merge commits, and the
+source on the base is the verified version — `slugify.py` is the correct,
+lowercased implementation, because the confident-but-wrong first attempt was
+caught and never merged. Toggle "live agent" to have a Strands agent on Gemini
+write the code instead of the deterministic worker.
