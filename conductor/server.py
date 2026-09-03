@@ -16,7 +16,9 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 from .models import Status
 
-UI = os.path.join(os.path.dirname(__file__), "ui", "index.html")
+UI_DIR = os.path.join(os.path.dirname(__file__), "ui")
+UI = os.path.join(UI_DIR, "index.html")
+LANDING = os.path.join(UI_DIR, "landing.html")
 
 _ORDER = [Status.ESCALATED, Status.REJECTED, Status.HELD, Status.DISPATCHED,
           Status.CLAIMED_DONE, Status.PENDING, Status.DONE, Status.BLOCKED]
@@ -204,9 +206,20 @@ def serve(conductor, port: int = 7616, open_browser: bool = True):
             elif self.path.startswith("/api/state"):
                 with lock:
                     self._send(200, json.dumps(state(conductor)))
+            elif self.path.startswith("/shot/"):
+                name = os.path.basename(self.path.split("?")[0])
+                path = os.path.join(os.path.dirname(UI_DIR), "..", "docs", "shots", name)
+                if os.path.isfile(path):
+                    with open(path, "rb") as f:
+                        self._send(200, f.read(), "image/png")
+                else:
+                    self._send(404, json.dumps({"error": "no shot"}))
+            elif self.path.split("?")[0] in ("/", "/index.html"):
+                with open(LANDING, "rb") as f:
+                    self._send(200, f.read(), "text/html; charset=utf-8")
             elif not self.path.startswith("/api"):
-                # Any non-API path (including /?theme=dark&open=plan) serves the
-                # single-page UI; the client reads the query string itself.
+                # /app and anything else non-API serves the SPA; the client
+                # reads its own query string for view/theme/deep-links.
                 with open(UI, "rb") as f:
                     self._send(200, f.read(), "text/html; charset=utf-8")
             else:

@@ -6,98 +6,125 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap">
 <style>
-/* Dark is the design's native world; light is derived from the same tokens.
-   Three states: bare :root = light default, prefers-color-scheme swaps the OS
-   default, and [data-theme] lets the toggle win in either direction. */
 :root{
-  --ground:#fbfbfd; --surface:#ffffff;
+  --ground:#fbfbfd; --surface:#ffffff; --side:#f4f5f8;
   --e1:rgba(10,12,20,.015); --e2:rgba(10,12,20,.04); --e3:rgba(10,12,20,.07);
   --line:rgba(10,12,20,.09); --line-strong:rgba(10,12,20,.14);
   --t1:#12151c; --t2:#5b6472; --t3:#8b93a1;
-  --accent:#4c5fd7;
+  --accent:#4c5fd7; --accent-soft:rgba(76,95,215,.10);
   --pass:#0f9d76; --pass-bg:rgba(15,157,118,.10);
   --fail:#d1462a; --fail-bg:rgba(209,70,42,.10); --fail-wash:rgba(209,70,42,.055);
   --held:#b0791a; --held-bg:rgba(176,121,26,.12);
   --mono:"JetBrains Mono",ui-monospace,"SF Mono",Menlo,monospace;
   --sans:"Inter",-apple-system,system-ui,"Segoe UI",sans-serif;
 }
-:root[data-theme="dark"],
-:root:not([data-theme="light"]){}
 .dk{
-  --ground:#08090a; --surface:#0f1011;
+  --ground:#08090a; --surface:#0f1011; --side:#0b0c0d;
   --e1:rgba(255,255,255,.02); --e2:rgba(255,255,255,.05); --e3:rgba(255,255,255,.08);
   --line:rgba(255,255,255,.08); --line-strong:rgba(255,255,255,.12);
   --t1:#f7f8f8; --t2:#8a8f98; --t3:#62666d;
-  --accent:#6f7ff0;
+  --accent:#6f7ff0; --accent-soft:rgba(111,127,240,.12);
   --pass:#3fd68a; --pass-bg:rgba(39,166,68,.10);
   --fail:#f34e52; --fail-bg:rgba(243,78,82,.10); --fail-wash:rgba(243,78,82,.06);
   --held:#f7bf8b; --held-bg:rgba(247,191,139,.10);
 }
 *{box-sizing:border-box;margin:0}
 [hidden]{display:none!important}
-html{background:var(--ground)}
+html,body{height:100%}
 body{background:var(--ground);color:var(--t1);font-family:var(--sans);
-  font-size:14px;line-height:1.5;-webkit-font-smoothing:antialiased;
-  letter-spacing:-.006em;padding:0 0 80px}
+  font-size:14px;line-height:1.5;-webkit-font-smoothing:antialiased;letter-spacing:-.006em}
 .mono{font-family:var(--mono);font-variant-numeric:tabular-nums}
-.wrap{max-width:1240px;margin:0 auto;padding:0 32px}
 
-.top{display:flex;align-items:center;justify-content:space-between;
-  padding:18px 32px;position:sticky;top:0;z-index:20;
-  background:var(--ground);border-bottom:1px solid var(--line);
-  -webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px)}
-.brand{font-family:var(--mono);font-size:12px;letter-spacing:.16em;color:var(--t3);
-  text-transform:uppercase;font-weight:500}
-.controls{display:flex;gap:8px;align-items:center}
-
-button{font-family:var(--sans);font-size:13px;font-weight:500;cursor:pointer;
-  color:var(--t1);background:var(--e2);border:1px solid var(--line);
-  border-radius:9999px;padding:7px 15px;letter-spacing:-.006em;
-  transition:background .13s,border-color .13s,transform .13s}
-button:hover{background:var(--e3);border-color:var(--line-strong)}
-button:active{transform:translateY(1px)}
-button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
-.ghost{background:transparent}
-.icon{font-size:15px;line-height:1;padding:7px 11px}
-
-.hero{padding:44px 0 30px}
-.headline{font-size:52px;font-weight:600;letter-spacing:-.022em;line-height:1.04;
-  display:flex;align-items:center;gap:18px;text-wrap:balance}
-.loop{display:inline-flex;align-items:center;gap:9px;font-family:var(--mono);
-  font-size:11px;letter-spacing:.1em;color:var(--t3);text-transform:uppercase;
-  padding-top:8px}
-.dot{width:7px;height:7px;border-radius:50%;background:var(--accent);
+/* app shell */
+.app{display:grid;grid-template-columns:236px 1fr;height:100vh;overflow:hidden}
+@media(max-width:840px){.app{grid-template-columns:60px 1fr}}
+.sidebar{background:var(--side);border-right:1px solid var(--line);display:flex;
+  flex-direction:column;padding:14px 12px;gap:2px;overflow:hidden}
+.ws{display:flex;align-items:center;gap:9px;padding:6px 8px 14px;font-weight:600;
+  font-size:14px;letter-spacing:-.01em}
+.ws .mark{width:22px;height:22px;border-radius:6px;background:var(--accent);flex:none;
+  display:grid;place-items:center;color:#fff;font-family:var(--mono);font-size:12px;font-weight:600}
+.navlabel{font-family:var(--mono);font-size:10px;letter-spacing:.11em;text-transform:uppercase;
+  color:var(--t3);padding:12px 8px 6px}
+.nav{display:flex;align-items:center;gap:10px;width:100%;padding:7px 9px;border-radius:7px;
+  background:transparent;border:0;color:var(--t2);font-family:var(--sans);font-size:13.5px;
+  font-weight:500;cursor:pointer;text-align:left;letter-spacing:-.006em;transition:.12s}
+.nav:hover{background:var(--e2);color:var(--t1)}
+.nav.active{background:var(--e3);color:var(--t1)}
+.nav .ic{width:16px;flex:none;text-align:center;font-size:14px;color:var(--t3)}
+.nav.active .ic{color:var(--accent)}
+.nav .badge{margin-left:auto;font-family:var(--mono);font-size:10px;font-weight:600;
+  background:var(--held);color:#fff;border-radius:9999px;padding:1px 7px;min-width:18px;text-align:center}
+.nav .badge.zero{background:var(--e3);color:var(--t3)}
+.navtext{white-space:nowrap;overflow:hidden}
+@media(max-width:840px){.navtext,.navlabel,.ws span,.side-foot .lbl{display:none}}
+.side-foot{margin-top:auto;display:flex;flex-direction:column;gap:6px;padding-top:12px;
+  border-top:1px solid var(--line)}
+.side-foot .plan{display:flex;align-items:center;gap:8px;padding:8px 9px;border-radius:7px;
+  border:1px solid var(--line-strong);background:transparent;color:var(--t1);
+  font-family:var(--sans);font-size:13px;font-weight:500;cursor:pointer;transition:.12s}
+.side-foot .plan:hover{background:var(--accent);border-color:var(--accent);color:#fff}
+.side-foot .run{display:flex;gap:6px}
+.side-foot .run button{flex:1;padding:6px;border-radius:7px;border:1px solid var(--line);
+  background:transparent;color:var(--t2);font-family:var(--sans);font-size:12px;cursor:pointer}
+.side-foot .run button:hover{background:var(--e2);color:var(--t1)}
+.side-foot .themebtn{display:flex;align-items:center;gap:8px;padding:7px 9px;border-radius:7px;
+  background:transparent;border:0;color:var(--t3);font-family:var(--sans);font-size:12.5px;cursor:pointer}
+.side-foot .themebtn:hover{color:var(--t1)}
+.loopchip{display:flex;align-items:center;gap:8px;padding:6px 9px;font-family:var(--mono);
+  font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--t3)}
+.dot{width:6px;height:6px;border-radius:50%;background:var(--accent);flex:none;
   box-shadow:0 0 0 0 rgba(111,127,240,.5);animation:pulse 2.4s ease-out infinite}
 @keyframes pulse{0%{box-shadow:0 0 0 0 rgba(111,127,240,.45)}
-  70%{box-shadow:0 0 0 9px rgba(111,127,240,0)}100%{box-shadow:0 0 0 0 rgba(111,127,240,0)}}
-@media (prefers-reduced-motion:reduce){.dot{animation:none}}
+  70%{box-shadow:0 0 0 8px rgba(111,127,240,0)}100%{box-shadow:0 0 0 0 rgba(111,127,240,0)}}
+@media(prefers-reduced-motion:reduce){.dot{animation:none}}
 
-.figures{display:flex;gap:56px;margin-top:34px;flex-wrap:wrap}
-.fig .n{font-family:var(--mono);font-size:44px;font-weight:500;letter-spacing:-.02em;line-height:1}
+/* content */
+.content{display:flex;flex-direction:column;overflow:hidden}
+.vhead{display:flex;align-items:center;justify-content:space-between;gap:16px;
+  padding:16px 28px;border-bottom:1px solid var(--line);flex:none}
+.vhead h1{font-size:16px;font-weight:600;letter-spacing:-.01em}
+.vhead .sub{color:var(--t3);font-family:var(--mono);font-size:11px;margin-top:2px}
+.vhead .actions{display:flex;gap:8px;align-items:center}
+.vbody{overflow:auto;padding:28px;flex:1}
+.vwrap{max-width:1080px;margin:0 auto}
+
+button.b{font-family:var(--sans);font-size:13px;font-weight:500;cursor:pointer;
+  color:var(--t1);background:var(--e2);border:1px solid var(--line);border-radius:8px;
+  padding:7px 14px;transition:.12s}
+button.b:hover{background:var(--e3);border-color:var(--line-strong)}
+button.b.primary{background:var(--accent);border-color:var(--accent);color:#fff}
+button.b.primary:hover{filter:brightness(1.08)}
+button.b.ghost{background:transparent}
+
+/* home hero */
+.hero{margin-bottom:34px}
+.headline{font-size:44px;font-weight:600;letter-spacing:-.022em;line-height:1.05;text-wrap:balance}
+.figures{display:flex;gap:52px;margin-top:30px;flex-wrap:wrap}
+.fig .n{font-family:var(--mono);font-size:40px;font-weight:500;letter-spacing:-.02em;line-height:1}
 .fig .l{font-family:var(--mono);font-size:11px;letter-spacing:.09em;color:var(--t3);
   text-transform:uppercase;margin-top:10px;max-width:210px}
 .fig.pass .n{color:var(--pass)} .fig.fail .n{color:var(--fail)}
 .fig.held .n{color:var(--held)} .fig.ink .n{color:var(--t1)}
 
-main{display:grid;grid-template-columns:minmax(0,1fr) 300px;gap:24px;margin-top:30px}
-@media(max-width:920px){main{grid-template-columns:1fr}}
 .label{font-family:var(--mono);font-size:11px;letter-spacing:.11em;color:var(--t3);
   text-transform:uppercase;font-weight:500;margin:0 0 12px}
 section{margin-bottom:30px}
 .card{background:var(--e1);border:1px solid var(--line);border-radius:12px}
 
-.decision{padding:22px 22px 20px}
-.decision.empty{border-style:dashed;text-align:center;padding:34px 22px}
-.decision .q{font-size:20px;font-weight:600;letter-spacing:-.017em}
+.decision{padding:20px 20px 18px;cursor:pointer;transition:border-color .13s}
+.decision:hover{border-color:var(--line-strong)}
+.decision.empty{border-style:dashed;text-align:center;padding:34px 22px;cursor:default}
+.decision .q{font-size:19px;font-weight:600;letter-spacing:-.015em}
 .decision .meta{color:var(--t2);font-size:13px;margin-top:8px}
 .decision .meta b{color:var(--t1);font-weight:500}
-.opts{display:flex;flex-wrap:wrap;gap:9px;margin-top:18px}
-.opts button{border-color:var(--line-strong);padding:9px 16px}
+.opts{display:flex;flex-wrap:wrap;gap:9px;margin-top:16px}
+.opts button{border-color:var(--line-strong);border-radius:9999px;padding:8px 15px}
+.opts .see{border-color:transparent;color:var(--accent)}
 .empty .run{color:var(--pass);font-size:15px;font-weight:500}
-.empty .sub{color:var(--t3);font-size:13px;margin-top:7px;max-width:440px;
-  margin-left:auto;margin-right:auto}
+.empty .sub{color:var(--t3);font-size:13px;margin-top:7px;max-width:460px;margin-inline:auto}
 
-.row{display:grid;grid-template-columns:112px 1fr auto auto;gap:14px;align-items:start;
+.row{display:grid;grid-template-columns:118px 1fr auto auto;gap:14px;align-items:start;
   padding:13px 18px;border-top:1px solid var(--line)}
 .row:first-child{border-top:0}
 .row.fail{background:var(--fail-wash)}
@@ -106,25 +133,26 @@ section{margin-bottom:30px}
 .c-done{color:var(--pass);background:var(--pass-bg)}
 .c-rejected{color:var(--fail);background:var(--fail-bg)}
 .c-held,.c-escalated{color:var(--held);background:var(--held-bg)}
-.c-dispatched,.c-claimed_done{color:var(--accent);background:rgba(111,127,240,.10)}
+.c-dispatched,.c-claimed_done{color:var(--accent);background:var(--accent-soft)}
 .c-pending,.c-blocked{color:var(--t3);background:var(--e2)}
 .row .t{font-size:14px;font-weight:500;letter-spacing:-.008em}
 .row .why{font-family:var(--mono);font-size:11.5px;color:var(--t3);margin-top:4px;word-break:break-word}
-.row .who{font-family:var(--mono);font-size:11px;color:var(--t3);white-space:nowrap}
-.row .cost{font-family:var(--mono);font-size:11px;color:var(--t3);white-space:nowrap}
+.row .who,.row .cost{font-family:var(--mono);font-size:11px;color:var(--t3);white-space:nowrap}
 .spec{font-family:var(--mono);font-size:9.5px;letter-spacing:.06em;color:var(--t3);
   border:1px solid var(--line);border-radius:4px;padding:1px 4px;margin-left:7px;vertical-align:2px}
 
-.panel{padding:16px 17px}
-.kv{display:flex;justify-content:space-between;gap:12px;align-items:baseline;
-  padding:5px 0;font-size:13px;color:var(--t2)}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+@media(max-width:720px){.grid2{grid-template-columns:1fr}}
+.panel{padding:18px}
+.kv{display:flex;justify-content:space-between;gap:12px;align-items:baseline;padding:6px 0;
+  font-size:13px;color:var(--t2)}
 .kv b{color:var(--t1);font-weight:500;font-family:var(--mono);font-variant-numeric:tabular-nums}
-.bar{height:6px;background:var(--e3);border-radius:9999px;overflow:hidden;margin:9px 0 6px}
+.bar{height:6px;background:var(--e3);border-radius:9999px;overflow:hidden;margin:10px 0 6px}
 .bar i{display:block;height:100%;background:var(--accent);transition:width .5s}
-.note{color:var(--t3);font-size:11.5px;margin-top:7px}
+.note{color:var(--t3);font-size:11.5px;margin-top:8px}
 .cost-row b.pass{color:var(--pass)} .cost-row b.fail{color:var(--fail)}
-.cost-row.total{border-top:1px solid var(--line);margin-top:7px;padding-top:9px}
-.trust-row{padding:8px 0;border-top:1px solid var(--line)}
+.cost-row.total{border-top:1px solid var(--line);margin-top:8px;padding-top:10px}
+.trust-row{padding:10px 0;border-top:1px solid var(--line)}
 .trust-row:first-child{border-top:0}
 .trust-head{display:flex;justify-content:space-between;align-items:center;gap:8px}
 .trust-head .who{font-size:13px;font-weight:500}
@@ -135,37 +163,61 @@ section{margin-bottom:30px}
 .t-trusted{color:var(--pass);background:var(--pass-bg)}
 .t-probation{color:var(--held);background:var(--held-bg)}
 .trust-row .detail{font-family:var(--mono);font-size:10.5px;color:var(--t3);margin-top:4px}
-.log{padding:14px 16px;max-height:260px;overflow:auto}
+.log{padding:16px;max-height:340px;overflow:auto}
 .log div{font-family:var(--mono);font-size:11px;color:var(--t3);padding:3px 0;
   border-top:1px solid var(--line);word-break:break-word}
 .log div:first-child{border-top:0;color:var(--t2)}
-.compression{font-family:var(--mono);font-size:11px;color:var(--t3);letter-spacing:.02em}
-.see{border-color:transparent;color:var(--accent);padding:9px 10px}
-.see:hover{background:var(--e2);border-color:transparent}
 
-/* decision detail overlay */
-.overlay{position:fixed;inset:0;z-index:50;display:flex;align-items:flex-start;
-  justify-content:center;padding:56px 24px;overflow:auto;
-  background:rgba(0,0,0,.5);backdrop-filter:blur(3px);
-  animation:fade .18s ease}
+/* team view */
+.hire{border:1px solid var(--held);border-radius:12px;padding:18px;background:var(--held-bg);margin-bottom:24px}
+.hire .htag{font-family:var(--mono);font-size:10px;letter-spacing:.1em;text-transform:uppercase;
+  color:var(--held);margin-bottom:9px}
+.hire .hq{font-size:16px;font-weight:600;letter-spacing:-.01em;line-height:1.35}
+.hire .hopts{display:flex;flex-wrap:wrap;gap:8px;margin-top:14px}
+.hire .hopts button{border-color:var(--line-strong)}
+.roster{border:1px solid var(--line);border-radius:12px;overflow:hidden}
+.mrow{display:grid;grid-template-columns:1fr auto auto;gap:16px;align-items:center;
+  padding:15px 18px;border-top:1px solid var(--line)}
+.mrow:first-child{border-top:0}
+.mrow.delegate{padding-left:32px;background:var(--e1)}
+.mrow .mn{font-size:14px;font-weight:600;letter-spacing:-.008em;display:flex;align-items:center;gap:8px}
+.mrow .mp{color:var(--t2);font-size:12px;margin-top:3px}
+.mrow .mp .princ{color:var(--t3)}
+.kind{font-family:var(--mono);font-size:9.5px;letter-spacing:.05em;text-transform:uppercase;
+  padding:2px 8px;border-radius:9999px;background:var(--e2);color:var(--t2)}
+.kind.agent{color:var(--accent);background:var(--accent-soft)}
+.skills{display:flex;gap:14px;flex-wrap:wrap;justify-content:flex-end;max-width:300px}
+.skill{font-family:var(--mono);font-size:11px;color:var(--t2);text-align:right}
+.skill .sk{color:var(--t3)} .skill .none{color:var(--t3)}
+.status-pill{font-family:var(--mono);font-size:9.5px;letter-spacing:.05em;text-transform:uppercase;
+  padding:3px 10px;border-radius:9999px;white-space:nowrap}
+.status-pill.trusted{color:var(--pass);background:var(--pass-bg)}
+.status-pill.probation{color:var(--held);background:var(--held-bg)}
+.status-pill.human{color:var(--t2);background:var(--e2)}
+.prob-note{margin-top:22px;border-top:1px solid var(--line);padding-top:16px}
+.prob-note .h{font-family:var(--mono);font-size:11px;letter-spacing:.1em;text-transform:uppercase;
+  color:var(--t3);margin-bottom:8px}
+.prob-note p{color:var(--t2);font-size:13px;line-height:1.5}
+
+/* overlays: plan + decision detail */
+.overlay{position:fixed;inset:0;z-index:50;display:flex;align-items:flex-start;justify-content:center;
+  padding:52px 24px;overflow:auto;background:rgba(0,0,0,.5);backdrop-filter:blur(3px);animation:fade .18s ease}
 @keyframes fade{from{opacity:0}to{opacity:1}}
-.sheet{width:100%;max-width:920px;background:var(--surface);
-  border:1px solid var(--line);border-radius:16px;padding:30px 32px 34px;
-  box-shadow:0 24px 80px rgba(0,0,0,.45)}
-.sheet .close{position:absolute;top:20px;right:24px}
-.d-q{font-size:30px;font-weight:600;letter-spacing:-.02em;line-height:1.08;
-  text-wrap:balance;max-width:80%}
+.sheet{width:100%;max-width:920px;background:var(--surface);border:1px solid var(--line);
+  border-radius:16px;padding:30px 32px 34px;box-shadow:0 24px 80px rgba(0,0,0,.45);position:relative}
+.sheet .close{position:absolute;top:18px;right:22px;background:transparent;border:0;
+  color:var(--t3);font-size:16px;cursor:pointer;padding:6px}
+.sheet .close:hover{color:var(--t1)}
+.d-q{font-size:30px;font-weight:600;letter-spacing:-.02em;line-height:1.08;text-wrap:balance;max-width:80%}
 .d-id{font-family:var(--mono);font-size:12px;color:var(--t3);margin-top:8px}
 .d-meta{color:var(--t2);font-size:13px;margin-top:6px}
-.answered{display:inline-flex;align-items:center;gap:7px;margin-top:14px;
-  font-family:var(--mono);font-size:11px;letter-spacing:.06em;text-transform:uppercase;
-  color:var(--pass);background:var(--pass-bg);padding:4px 11px;border-radius:9999px}
-
+.answered{display:inline-flex;align-items:center;gap:7px;margin-top:14px;font-family:var(--mono);
+  font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--pass);background:var(--pass-bg);
+  padding:4px 11px;border-radius:9999px}
 .diagram{margin:26px 0 8px}
 .dcap{color:var(--t3);font-size:12.5px;margin:2px 4px 22px;max-width:640px}
 .branches{display:grid;gap:16px;grid-template-columns:repeat(auto-fit,minmax(220px,1fr))}
-.branch{border:1px solid var(--line);border-radius:12px;padding:16px;background:var(--e1);
-  position:relative;transition:border-color .15s}
+.branch{border:1px solid var(--line);border-radius:12px;padding:16px;background:var(--e1);transition:border-color .15s}
 .branch.chosen{border-color:var(--pass);background:var(--pass-bg)}
 .branch.discarded{opacity:.5}
 .b-head{display:flex;justify-content:space-between;align-items:baseline;gap:10px;margin-bottom:4px}
@@ -173,26 +225,22 @@ section{margin-bottom:30px}
 .b-cost{font-family:var(--mono);font-size:12px;color:var(--t3);white-space:nowrap}
 .b-state{font-family:var(--mono);font-size:10.5px;letter-spacing:.05em;text-transform:uppercase;
   margin:8px 0 12px;color:var(--t3)}
-.b-state.chosen{color:var(--pass)} .b-state.gone{color:var(--t3)}
+.b-state.chosen{color:var(--pass)}
 .w{display:flex;gap:9px;align-items:flex-start;padding:8px 0;border-top:1px solid var(--line)}
 .w:first-of-type{border-top:0}
 .w .tick{color:var(--pass);font-family:var(--mono);font-size:12px;flex:none;margin-top:1px}
 .w .wt{font-size:12.5px}
 .w .we{font-family:var(--mono);font-size:10.5px;color:var(--t3);margin-top:3px;word-break:break-all}
 .d-opts{display:flex;flex-wrap:wrap;gap:10px;margin-top:24px}
-.d-opts button{padding:11px 18px;border-color:var(--line-strong)}
-.d-opts button.chosen{background:var(--accent);border-color:var(--accent);color:#fff}
+.d-opts button{padding:11px 18px;border-color:var(--line-strong);border-radius:9999px}
 .folded{margin-top:26px;border-top:1px solid var(--line);padding-top:16px}
-.folded summary{font-family:var(--mono);font-size:11px;letter-spacing:.1em;
-  text-transform:uppercase;color:var(--t3);cursor:pointer;list-style:none}
+.folded summary{font-family:var(--mono);font-size:11px;letter-spacing:.1em;text-transform:uppercase;
+  color:var(--t3);cursor:pointer;list-style:none}
 .folded summary::-webkit-details-marker{display:none}
 .folded ul{list-style:none;padding:0;margin:12px 0 0}
 .folded li{font-family:var(--mono);font-size:11.5px;color:var(--t2);padding:4px 0}
 .folded li span{color:var(--t3)}
-
-/* plan review */
-.intent{font-size:20px;font-weight:600;letter-spacing:-.015em;line-height:1.4;
-  color:var(--t2);text-wrap:pretty}
+.intent{font-size:20px;font-weight:600;letter-spacing:-.015em;line-height:1.4;color:var(--t2);text-wrap:pretty}
 .intent::before{content:"“"} .intent::after{content:"”"}
 .src{font-family:var(--mono);font-size:11px;color:var(--t3);margin-top:10px}
 .plan-list{margin-top:22px;border:1px solid var(--line);border-radius:12px;overflow:hidden}
@@ -200,16 +248,14 @@ section{margin-bottom:30px}
   padding:14px 16px;border-top:1px solid var(--line)}
 .prow:first-child{border-top:0}
 .prow .pt{font-size:14px;font-weight:500;letter-spacing:-.008em}
-.proof{font-family:var(--mono);font-size:11.5px;color:var(--t2);margin-top:5px;
-  display:flex;gap:6px;align-items:baseline}
+.proof{font-family:var(--mono);font-size:11.5px;color:var(--t2);margin-top:5px;display:flex;gap:6px;align-items:baseline}
 .proof .k{color:var(--pass);flex:none}
 .proof.review .k{color:var(--held)}
-.assignee{font-family:var(--mono);font-size:11px;color:var(--t2);
-  border:1px solid var(--line);border-radius:9999px;padding:3px 10px;white-space:nowrap}
+.assignee{font-family:var(--mono);font-size:11px;color:var(--t2);border:1px solid var(--line);
+  border-radius:9999px;padding:3px 10px;white-space:nowrap}
 .pcost{font-family:var(--mono);font-size:11px;color:var(--t3);white-space:nowrap;padding-top:3px}
 .dtag{font-family:var(--mono);font-size:9.5px;letter-spacing:.05em;text-transform:uppercase;
-  color:var(--held);background:var(--held-bg);padding:2px 8px;border-radius:9999px;margin-left:8px;
-  vertical-align:1px}
+  color:var(--held);background:var(--held-bg);padding:2px 8px;border-radius:9999px;margin-left:8px;vertical-align:1px}
 .dnote{color:var(--t3);font-size:11px;margin-top:4px}
 .rejected-head{font-family:var(--mono);font-size:11px;letter-spacing:.1em;text-transform:uppercase;
   color:var(--t3);margin:26px 0 4px}
@@ -220,92 +266,48 @@ section{margin-bottom:30px}
 .rrow .rt{font-size:13.5px;font-weight:500}
 .rrow .rr{font-family:var(--mono);font-size:11.5px;color:var(--fail);margin-top:4px}
 .plan-foot{display:flex;justify-content:space-between;align-items:center;gap:16px;margin-top:26px}
-.plan-foot .approve{background:var(--accent);border-color:var(--accent);color:#fff;padding:11px 20px}
-.plan-foot .approve:hover{filter:brightness(1.08)}
-
-/* team */
-.hire{border:1px solid var(--held);border-radius:12px;padding:18px;
-  background:var(--held-bg);margin-bottom:24px}
-.hire .htag{font-family:var(--mono);font-size:10px;letter-spacing:.1em;text-transform:uppercase;
-  color:var(--held);margin-bottom:9px}
-.hire .hq{font-size:16px;font-weight:600;letter-spacing:-.01em;line-height:1.35}
-.hire .hopts{display:flex;flex-wrap:wrap;gap:8px;margin-top:14px}
-.hire .hopts button{border-color:var(--line-strong)}
-.roster{border:1px solid var(--line);border-radius:12px;overflow:hidden}
-.mrow{display:grid;grid-template-columns:1fr auto auto;gap:16px;align-items:center;
-  padding:15px 16px;border-top:1px solid var(--line)}
-.mrow:first-child{border-top:0}
-.mrow.delegate{padding-left:30px;background:var(--e1)}
-.mrow .mn{font-size:14px;font-weight:600;letter-spacing:-.008em;display:flex;align-items:center;gap:8px}
-.mrow .mp{color:var(--t2);font-size:12px;margin-top:3px}
-.mrow .mp .princ{color:var(--t3)}
-.kind{font-family:var(--mono);font-size:9.5px;letter-spacing:.05em;text-transform:uppercase;
-  padding:2px 8px;border-radius:9999px;background:var(--e2);color:var(--t2)}
-.kind.agent{color:var(--accent);background:rgba(111,127,240,.10)}
-.skills{display:flex;gap:12px;flex-wrap:wrap;justify-content:flex-end;max-width:280px}
-.skill{font-family:var(--mono);font-size:11px;color:var(--t2);text-align:right}
-.skill .sk{color:var(--t3)}
-.skill .none{color:var(--t3)}
-.status-pill{font-family:var(--mono);font-size:9.5px;letter-spacing:.05em;text-transform:uppercase;
-  padding:3px 10px;border-radius:9999px;white-space:nowrap}
-.status-pill.trusted{color:var(--pass);background:var(--pass-bg)}
-.status-pill.probation{color:var(--held);background:var(--held-bg)}
-.status-pill.human{color:var(--t2);background:var(--e2)}
-.prob-note{margin-top:22px;border-top:1px solid var(--line);padding-top:16px}
-.prob-note .h{font-family:var(--mono);font-size:11px;letter-spacing:.1em;text-transform:uppercase;
-  color:var(--t3);margin-bottom:8px}
-.prob-note p{color:var(--t2);font-size:13px;line-height:1.5;margin:0}
-::-webkit-scrollbar{width:8px;height:8px}
+::-webkit-scrollbar{width:9px;height:9px}
 ::-webkit-scrollbar-thumb{background:var(--e3);border-radius:9999px}
+::-webkit-scrollbar-track{background:transparent}
 </style>
 
 <script>
-// Set the theme before first paint so there is no flash.
 (function(){try{var s=localStorage.getItem("conductor-theme");
   var d=s?s==="dark":(window.matchMedia&&matchMedia("(prefers-color-scheme: dark)").matches);
   if(d)document.documentElement.classList.add("dk");}catch(e){}})();
 </script>
-<div class="top">
-  <span class="brand">Conductor</span>
-  <div class="controls">
-    <span class="compression" id="compression"></span>
-    <button class="ghost icon" id="theme" onclick="toggleTheme()" aria-label="Toggle theme">◐</button>
-    <button class="ghost" onclick="openPlan()">Plan a sprint</button>
-    <button class="ghost" onclick="openTeam()">Team</button>
-    <button class="ghost" onclick="tick(1)">Advance tick</button>
-    <button onclick="tick(6)">Run six</button>
-  </div>
-</div>
 
-<div class="wrap">
-  <div class="hero">
-    <div class="headline"><span id="headline">Loading</span>
-      <span class="loop"><span class="dot"></span> Loop running</span></div>
-    <div class="figures" id="figures"></div>
-  </div>
-
-  <main>
-    <div>
-      <section>
-        <div class="label">Needs you</div>
-        <div id="decisions"></div>
-      </section>
-      <section>
-        <div class="label">Board</div>
-        <div class="card" id="board"></div>
-      </section>
+<div class="app">
+  <aside class="sidebar">
+    <div class="ws"><span class="mark">C</span><span>Conductor</span></div>
+    <div class="navlabel">Workspace</div>
+    <button class="nav active" data-view="home" onclick="go('home')"><span class="ic">◎</span>
+      <span class="navtext">Home</span><span class="badge zero" id="nav-badge">0</span></button>
+    <button class="nav" data-view="board" onclick="go('board')"><span class="ic">▤</span><span class="navtext">Board</span></button>
+    <button class="nav" data-view="decisions" onclick="go('decisions')"><span class="ic">◇</span><span class="navtext">Decisions</span></button>
+    <button class="nav" data-view="team" onclick="go('team')"><span class="ic">◐</span><span class="navtext">Team</span></button>
+    <button class="nav" data-view="cost" onclick="go('cost')"><span class="ic">$</span><span class="navtext">Cost & trust</span></button>
+    <div class="loopchip"><span class="dot"></span><span class="navtext">Loop running</span></div>
+    <div class="side-foot">
+      <button class="plan" onclick="openPlan()"><span>+</span><span class="navtext">Plan a sprint</span></button>
+      <div class="run">
+        <button onclick="tick(1)">Tick</button>
+        <button onclick="tick(6)">Run six</button>
+      </div>
+      <button class="themebtn" id="theme" onclick="toggleTheme()"><span>◐</span><span class="navtext lbl">Theme</span></button>
     </div>
+  </aside>
 
-    <div>
-      <section><div class="label">Attention</div><div class="card" id="attention"></div></section>
-      <section><div class="label">Cost</div><div class="card" id="cost"></div></section>
-      <section><div class="label">Trust</div><div class="card" id="trust"></div></section>
-      <section><div class="label">Log</div><div class="card log" id="log"></div></section>
-    </div>
+  <main class="content">
+    <header class="vhead">
+      <div><h1 id="vtitle">Home</h1><div class="sub" id="vsub"></div></div>
+      <div class="actions" id="vactions"></div>
+    </header>
+    <div class="vbody"><div class="vwrap" id="vbody"></div></div>
   </main>
 </div>
 
-<div class="overlay" id="overlay" hidden onclick="if(event.target===this)closeDecision()">
+<div class="overlay" id="overlay" hidden onclick="if(event.target===this)closeSheet()">
   <div class="sheet" id="sheet"></div>
 </div>
 
@@ -313,269 +315,229 @@ section{margin-bottom:30px}
 const $ = id => document.getElementById(id);
 const esc = s => String(s ?? "").replace(/[<>&"]/g, c => ({"<":"&lt;",">":"&gt;","&":"&amp;",'"':"&quot;"}[c]));
 const prev = {};
+let S = null, VIEW = "home", teamCache = null;
 
-function count(el, k, to, pre="", suf=""){
-  const from = prev[k] ?? to; prev[k] = to;
-  if (from === to){ el.textContent = pre+to+suf; return; }
-  const start = performance.now(), dur = 460;
-  const step = now => {
-    const p = Math.min(1, (now-start)/dur);
-    el.textContent = pre + Math.round(from + (to-from)*(1-Math.pow(1-p,3))) + suf;
-    if (p<1) requestAnimationFrame(step);
-  };
+function count(el, k, to){
+  const suf = el.dataset.suf||"", from = prev[k];
+  prev[k] = to;
+  if (from === undefined || from === to){ el.textContent = to + suf; return; }
+  const start = performance.now(), dur=460;
+  const step = now => { const p=Math.min(1,(now-start)/dur);
+    el.textContent = Math.round(from+(to-from)*(1-Math.pow(1-p,3))) + suf;
+    if(p<1) requestAnimationFrame(step); };
   requestAnimationFrame(step);
 }
 
-function render(s){
+/* ---- views ---- */
+function viewHome(s){
   const n = s.decisions.length;
-  $("headline").textContent = n===0 ? "Nothing needs you."
-    : n===1 ? "One thing needs you." : n+" things need you.";
-  $("compression").textContent = s.compression;
-
-  // Each figure: [colour, key, integer-to-animate | null, prefix, suffix, static-text, label]
-  const m = s.metrics, c = s.cost, att = s.attention[0] || {spent:0,total:0};
+  $("vtitle").textContent = n===0 ? "Nothing needs you." : n===1 ? "One thing needs you." : n+" things need you.";
+  $("vsub").textContent = s.compression;
+  $("vactions").innerHTML = `<button class="b" onclick="go('board')">Open board</button>
+    <button class="b primary" onclick="openPlan()">Plan a sprint</button>`;
+  const m=s.metrics, c=s.cost, att=s.attention[0]||{spent:0};
   const figs = n===0
-    ? [["ink","f0",m.verified,"","","","Verified this run"],
-       ["pass","f1",0,"","","","Things need you"],
-       ["held","f2",s.in_flight,"","","","In flight now"]]
-    : [["fail","f3",m.claims_rejected,"","","","Claims caught before you saw them"],
-       ["ink","f4",null,"","","$"+c.discarded.toFixed(2),"Spent building answers overnight"],
-       ["held","f5",att.spent,"","m","","Attention spent today"]];
-  $("figures").innerHTML = figs.map(([cls,k,,,,,l])=>
-    `<div class="fig ${cls}"><div class="n" id="${k}"></div><div class="l">${l}</div></div>`).join("");
-  figs.forEach(([,k,num,pre,suf,stat])=>{
-    const el = $(k);
-    if (num===null) el.textContent = stat;
-    else count(el, k, num, pre, suf);
-  });
-
-  $("decisions").innerHTML = n===0
+    ? [["ink",m.verified,"","","Verified this run"],["pass",0,"","","Things need you"],["held",s.in_flight,"","","In flight now"]]
+    : [["fail",m.claims_rejected,"","","Claims caught before you saw them"],
+       ["ink",null,"$"+c.discarded.toFixed(2),"","Spent building answers overnight"],
+       ["held",att.spent,"","m","Attention spent today"]];
+  const decHtml = n===0
     ? `<div class="card decision empty"><div class="run">The loop is running.</div>
        <div class="sub">Verifying, recovering and dispatching. You will hear from it when there is a judgment call.</div></div>`
-    : s.decisions.map(d=>`
-      <div class="card decision" style="margin-bottom:11px">
-        <div class="q">${esc(d.question)}</div>
-        <div class="meta">unblocks <b>${d.unblocks}</b> items${
-          d.compressed_from>1?` · compressed from <b>${d.compressed_from}</b> escalations`:""}${
-          d.branches?` · <b>${d.prebuilt}</b> of ${d.branches} branches already built · $${d.spent.toFixed(4)} spent`:""}</div>
-        ${d.needs_framing
-          ? `<div class="note">No options yet. This one needs framing before anyone can answer it, so nothing was speculated against it.</div>`
-          : `<div class="opts">${d.options.map(o=>
-              `<button onclick="event.stopPropagation();answer('${d.id}','${esc(o)}')">${esc(o)}</button>`).join("")}
-             ${d.branches?`<button class="ghost see" onclick="event.stopPropagation();openDecision('${d.id}')">See the branches →</button>`:""}</div>`}
-      </div>`).join("");
-
-  $("board").innerHTML = s.board.map(x=>`
+    : s.decisions.map(d=>decisionCard(d)).join("");
+  $("vbody").innerHTML = `
+    <div class="hero"><div class="figures">${figs.map(([cls,num,lit,suf,l],i)=>
+      `<div class="fig ${cls}"><div class="n" id="hf${i}" data-suf="${suf}">${lit!==""?lit:num}</div>
+       <div class="l">${l}</div></div>`).join("")}</div></div>
+    <section><div class="label">Needs you</div>${decHtml}</section>
+    <section><div class="label">Recent activity</div><div class="card log">${
+      s.events.slice(0,14).map(e=>`<div>${esc(e)}</div>`).join("")}</div></section>`;
+  figs.forEach(([,num],i)=>{ const el=$("hf"+i); if(num!==null){ el.dataset.suf=el.dataset.suf||""; count(el,"hf"+i,num);} });
+}
+function decisionCard(d){
+  return `<div class="card decision" style="margin-bottom:11px" onclick="openDecision('${d.id}')">
+    <div class="q">${esc(d.question)}</div>
+    <div class="meta">unblocks <b>${d.unblocks}</b> items${
+      d.compressed_from>1?` · compressed from <b>${d.compressed_from}</b> escalations`:""}${
+      d.branches?` · <b>${d.prebuilt}</b> of ${d.branches} branches already built · $${d.spent.toFixed(4)} spent`:""}</div>
+    ${d.needs_framing
+      ? `<div class="note">No options yet. This one needs framing before anyone can answer it.</div>`
+      : `<div class="opts">${d.options.map(o=>
+          `<button onclick="event.stopPropagation();answer('${d.id}','${esc(o)}')">${esc(o)}</button>`).join("")}
+         ${d.branches?`<button class="see" onclick="event.stopPropagation();openDecision('${d.id}')">See the branches →</button>`:""}</div>`}
+  </div>`;
+}
+function viewBoard(s){
+  $("vtitle").textContent="Board"; $("vsub").textContent=`${s.board.length} commitments`;
+  $("vactions").innerHTML=`<button class="b" onclick="tick(6)">Run six</button>`;
+  $("vbody").innerHTML=`<div class="card">${s.board.map(x=>`
     <div class="row ${x.status==='rejected'?'fail':''}">
       <span class="chip c-${x.status}">${x.status.replace('_',' ')}</span>
       <div><span class="t">${esc(x.title)}</span>${x.speculative?'<span class="spec">SPEC</span>':''}
         <div class="why">${esc(x.reason)}</div></div>
-      <span class="who">${esc(x.owner||'')}</span>
-      <span class="cost">${x.review_cost}m</span>
-    </div>`).join("");
-
-  $("attention").innerHTML = s.attention.map(a=>{
-    const used = a.total ? Math.round((a.spent+a.committed)/a.total*100) : 0;
-    return `<div class="panel"><div class="kv"><span>${esc(a.reviewer)}</span><b>${a.remaining}m free</b></div>
-      <div class="bar"><i style="width:${used}%"></i></div>
-      <div class="note">${a.spent}m spent · ${a.committed}m in flight · ${a.total}m budget</div></div>`;
-  }).join("") || '<div class="panel note">no reviewers yet</div>';
-
-  $("cost").innerHTML = `<div class="panel">
-    <div class="kv cost-row"><span>on work that passed</span><b class="pass">$${c.verified.toFixed(4)}</b></div>
-    <div class="kv cost-row"><span>on claims that failed</span><b class="fail">$${c.rejected.toFixed(4)}</b></div>
-    <div class="kv cost-row"><span>on discarded branches</span><b>$${c.discarded.toFixed(4)}</b></div>
-    <div class="kv cost-row total"><span>per verified item</span><b>$${c.per_verified.toFixed(4)}</b></div>
-    <div class="note">failed claims were never reviewed by a person</div></div>`;
-
-  $("trust").innerHTML = `<div class="panel">${s.trust.map(t=>{
-    const cls = t.type!=='agent' ? 't-human' : (t.probation ? 't-probation' : 't-trusted');
-    const lab = t.type!=='agent' ? 'human' : (t.probation ? 'probation' : 'trusted');
-    const detail = t.detail && !t.detail.includes('no history') ? `<div class="detail">${esc(t.detail)}</div>` : '';
-    return `<div class="trust-row"><div class="trust-head">
-      <span class="who">${esc(t.worker)}${t.principal?` <small>for ${esc(t.principal)}</small>`:''}</span>
-      <span class="tpill ${cls}">${lab}</span></div>${detail}</div>`;
-  }).join("")}</div>`;
-
-  $("log").innerHTML = s.events.map(e=>`<div>${esc(e)}</div>`).join("");
+      <span class="who">${esc(x.owner||'')}</span><span class="cost">${x.review_cost}m</span>
+    </div>`).join("")}</div>`;
+}
+function viewDecisions(s){
+  $("vtitle").textContent="Decisions"; $("vsub").textContent=s.compression;
+  $("vactions").innerHTML="";
+  const open = s.decisions.length ? s.decisions.map(d=>decisionCard(d)).join("")
+    : `<div class="card decision empty"><div class="run">No open decisions.</div>
+       <div class="sub">The loop only surfaces a question when a human's judgment is genuinely required.</div></div>`;
+  $("vbody").innerHTML=`<section><div class="label">Open</div>${open}</section>`;
+}
+function viewCost(s){
+  $("vtitle").textContent="Cost & trust"; $("vsub").textContent=`$${s.cost.per_verified.toFixed(4)} per verified item`;
+  $("vactions").innerHTML="";
+  const c=s.cost;
+  $("vbody").innerHTML=`<div class="grid2">
+    <div class="card panel"><div class="label">Cost</div>
+      <div class="kv cost-row"><span>on work that passed</span><b class="pass">$${c.verified.toFixed(4)}</b></div>
+      <div class="kv cost-row"><span>on claims that failed</span><b class="fail">$${c.rejected.toFixed(4)}</b></div>
+      <div class="kv cost-row"><span>on discarded branches</span><b>$${c.discarded.toFixed(4)}</b></div>
+      <div class="kv cost-row total"><span>per verified item</span><b>$${c.per_verified.toFixed(4)}</b></div>
+      <div class="note">Failed claims were never reviewed by a person.</div></div>
+    <div class="card panel"><div class="label">Attention</div>${s.attention.map(a=>{
+      const used=a.total?Math.round((a.spent+a.committed)/a.total*100):0;
+      return `<div class="kv"><span>${esc(a.reviewer)}</span><b>${a.remaining}m free</b></div>
+        <div class="bar"><i style="width:${used}%"></i></div>
+        <div class="note">${a.spent}m spent · ${a.committed}m in flight · ${a.total}m budget</div>`;}).join("")}</div>
+    <div class="card panel" style="grid-column:1/-1"><div class="label">Trust</div>${s.trust.map(t=>{
+      const cls=t.type!=='agent'?'t-human':(t.probation?'t-probation':'t-trusted');
+      const lab=t.type!=='agent'?'human':(t.probation?'probation':'trusted');
+      const detail=t.detail&&!t.detail.includes('no history')?`<div class="detail">${esc(t.detail)}</div>`:'';
+      return `<div class="trust-row"><div class="trust-head">
+        <span class="who">${esc(t.worker)}${t.principal?` <small>for ${esc(t.principal)}</small>`:''}</span>
+        <span class="tpill ${cls}">${lab}</span></div>${detail}</div>`;}).join("")}</div>
+  </div>`;
+}
+async function viewTeam(){
+  $("vtitle").textContent="Team"; $("vsub").textContent="humans and agents, one roster";
+  $("vactions").innerHTML="";
+  const t = teamCache = await (await fetch("/api/team")).json();
+  const skill = m => m.skills.map(s=> s.score===null
+    ? `<div class="skill"><span class="sk">${esc(s.kind)}</span> <span class="none">—</span></div>`
+    : `<div class="skill"><span class="sk">${esc(s.kind)}</span> ${Math.round(s.score*100)}% <span class="none">(${s.passes}/${s.total})</span></div>`).join("");
+  const pill = m => m.type!=="agent"?`<span class="status-pill human">human</span>`
+    : m.probation?`<span class="status-pill probation">probation</span>`:`<span class="status-pill trusted">trusted</span>`;
+  const rows = t.members.map(m=>`<div class="mrow ${m.principal?'delegate':''}">
+    <div><div class="mn">${esc(m.name)} <span class="kind ${m.type}">${m.type}</span></div>
+      <div class="mp">${esc(m.purpose)}${m.principal
+        ? ` · <span class="princ">acts for ${esc(m.principal.replace('human_',''))}, inherits their scopes, reviewed by them</span>`
+        : m.budget?` · ${m.budget}m review budget`:''}</div></div>
+    <div class="skills">${skill(m)}</div>${pill(m)}</div>`).join("");
+  const hire = t.proposals.map(p=>`<div class="hire"><div class="htag">Hiring proposal</div>
+    <div class="hq">${esc(p.question)}</div>
+    <div class="hopts">${p.options.map(o=>`<button class="b">${esc(o)}</button>`).join("")}</div></div>`).join("");
+  $("vbody").innerHTML=`${hire}<div class="roster">${rows}</div>
+    <div class="prob-note"><div class="h">Probation</div>
+    <p>New teammates start with no trust. Everything they claim is deeply verified until they earn a lighter check. Graduation is on evidence, not time served.</p></div>`;
 }
 
-async function load(){ try{ render(await (await fetch("/api/state")).json()); }catch(e){} }
-async function post(path, body){
-  render(await (await fetch(path,{method:"POST",headers:{"Content-Type":"application/json"},
-    body:JSON.stringify(body)})).json());
+/* ---- router ---- */
+function go(v){
+  VIEW=v;
+  document.querySelectorAll(".nav").forEach(n=>n.classList.toggle("active",n.dataset.view===v));
+  if(v==="team") viewTeam(); else if(S) draw();
 }
-const answer = (id,choice)=>{ closeDecision(); return post("/api/answer",{decision_id:id,choice}); };
-const tick = ticks=>post("/api/tick",{ticks});
+function draw(){
+  if(!S) return;
+  $("nav-badge").textContent = S.decisions.length;
+  $("nav-badge").classList.toggle("zero", S.decisions.length===0);
+  if(VIEW==="home") viewHome(S);
+  else if(VIEW==="board") viewBoard(S);
+  else if(VIEW==="decisions") viewDecisions(S);
+  else if(VIEW==="cost") viewCost(S);
+}
 
-// --- decision detail: the branches built while the question waited ---------
-let openId = null;
+/* ---- overlays ---- */
 function branchPaths(n){
-  // n curved paths diverging from one point on the left to evenly spread ends.
   const W=560,H=Math.max(120,n*74),x0=8,y0=H/2,x1=W-8;
   let out=`<svg viewBox="0 0 ${W} ${H}" width="100%" preserveAspectRatio="xMidYMid meet" aria-hidden="true">`;
-  for(let i=0;i<n;i++){
-    const y1=n===1?y0:(H/(n+1))*(i+1);
-    const bright = i===0;
-    out+=`<path d="M${x0} ${y0} C ${W*.42} ${y0}, ${W*.5} ${y1}, ${x1} ${y1}"
-      fill="none" stroke="${bright?'var(--line-strong)':'var(--line)'}"
-      stroke-width="${bright?1.6:1}"/>`;
-  }
-  out+=`<circle cx="${x0}" cy="${y0}" r="3.5" fill="var(--accent)"/></svg>`;
-  return out;
+  for(let i=0;i<n;i++){ const y1=n===1?y0:(H/(n+1))*(i+1),br=i===0;
+    out+=`<path d="M${x0} ${y0} C ${W*.42} ${y0}, ${W*.5} ${y1}, ${x1} ${y1}" fill="none"
+      stroke="${br?'var(--line-strong)':'var(--line)'}" stroke-width="${br?1.6:1}"/>`; }
+  return out+`<circle cx="${x0}" cy="${y0}" r="3.5" fill="var(--accent)"/></svg>`;
 }
 async function openDecision(id){
-  openId = id;
-  const d = await (await fetch("/api/decision?id="+encodeURIComponent(id))).json();
-  if (d.error){ closeDecision(); return; }
-  const bn = d.branches.length;
-  const state = b => b.chosen ? `<div class="b-state chosen">merged — already verified</div>`
-    : b.discarded ? `<div class="b-state gone">discarded when you chose</div>`
-    : `<div class="b-state">${b.verified}/${b.total} verified · waiting on your answer</div>`;
-  const work = b => b.work.map(w=>`
-    <div class="w"><span class="tick">${w.status==='done'?'✓':'·'}</span>
-      <div><div class="wt">${esc(w.title)}</div>
-        ${w.evidence?`<div class="we">${esc(w.evidence)}</div>`:''}</div></div>`).join("");
-
-  $("sheet").innerHTML = `
-    <button class="ghost icon close" onclick="closeDecision()" aria-label="Close">✕</button>
-    <div class="d-q">${esc(d.question)}</div>
-    <div class="d-id">${esc(d.id)}</div>
+  const d=await (await fetch("/api/decision?id="+encodeURIComponent(id))).json();
+  if(d.error) return;
+  const bn=d.branches.length;
+  const state=b=>b.chosen?`<div class="b-state chosen">merged — already verified</div>`
+    :b.discarded?`<div class="b-state">discarded when you chose</div>`
+    :`<div class="b-state">${b.verified}/${b.total} verified · waiting on your answer</div>`;
+  const work=b=>b.work.map(w=>`<div class="w"><span class="tick">${w.status==='done'?'✓':'·'}</span>
+    <div><div class="wt">${esc(w.title)}</div>${w.evidence?`<div class="we">${esc(w.evidence)}</div>`:''}</div></div>`).join("");
+  $("sheet").innerHTML=`<button class="close" onclick="closeSheet()">✕</button>
+    <div class="d-q">${esc(d.question)}</div><div class="d-id">${esc(d.id)}</div>
     <div class="d-meta">unblocks ${d.unblocks} items · $${d.spent.toFixed(4)} spent building answers</div>
     ${d.answer?`<div class="answered">✓ answered — ${esc(d.answer)}</div>`:''}
-
     ${bn?`<div class="diagram">${branchPaths(bn)}</div>
       <div class="dcap">Built while this question was open. Choosing an answer merges that branch immediately; the others are discarded. The waiting time was already spent doing the work.</div>
-      <div class="branches">${d.branches.map(b=>`
-        <div class="branch ${b.chosen?'chosen':''} ${b.discarded?'discarded':''}">
-          <div class="b-head"><div class="b-opt">${esc(b.option)}</div>
-            <div class="b-cost">$${b.cost.toFixed(4)}</div></div>
-          ${state(b)}
-          ${work(b)}
-        </div>`).join("")}</div>`
-      : `<div class="dcap" style="margin-top:22px">This question has no framed options yet, so nothing was speculated against it.</div>`}
-
-    ${!d.answer && d.options.length>=2 ? `<div class="d-opts">${d.options.map(o=>
+      <div class="branches">${d.branches.map(b=>`<div class="branch ${b.chosen?'chosen':''} ${b.discarded?'discarded':''}">
+        <div class="b-head"><div class="b-opt">${esc(b.option)}</div><div class="b-cost">$${b.cost.toFixed(4)}</div></div>
+        ${state(b)}${work(b)}</div>`).join("")}</div>`
+      :`<div class="dcap" style="margin-top:22px">This question has no framed options yet, so nothing was speculated against it.</div>`}
+    ${!d.answer&&d.options.length>=2?`<div class="d-opts">${d.options.map(o=>
       `<button onclick="answer('${d.id}','${esc(o)}')">${esc(o)}</button>`).join("")}</div>`:''}
-
     ${d.compressed_from.length>1?`<details class="folded"><summary>Compressed from ${d.compressed_from.length} escalations</summary>
       <ul>${d.compressed_from.map(e=>`<li><span>${esc(e.id)}</span> · ${esc(e.title)}</li>`).join("")}</ul></details>`:''}`;
-  $("overlay").hidden = false;
-  document.body.style.overflow = "hidden";
+  showSheet();
 }
-function closeDecision(){
-  openId = null;
-  $("overlay").hidden = true;
-  document.body.style.overflow = "";
-}
-// --- plan review: the one moment a person shapes the work ------------------
 async function openPlan(){
-  const p = await (await fetch("/api/plan")).json();
-  const assignee = c =>
-    c.judgment ? "asked, not assigned"
-    : c.work_kind==="design" ? "Sarah"
-    : c.work_kind==="research" ? "research-agent"
-    : c.work_kind==="content" ? "docs-agent"
-    : "impl-agent";
-  const rows = p.commitments.map(c=>`
-    <div class="prow">
-      <div><span class="pt">${esc(c.title)}</span>${c.judgment?'<span class="dtag">Decision</span>':''}
-        <div class="proof ${c.proof_kind==='review'?'review':''}">
-          <span class="k">proof:</span> ${esc(c.proof)}</div>
-        ${c.judgment?'<div class="dnote">this will be asked, not assigned</div>':''}
-        ${c.depends_on.length?`<div class="dnote">after: ${c.depends_on.map(esc).join(', ')}</div>`:''}</div>
-      <span class="assignee">${esc(assignee(c))}</span>
-      <span class="pcost">${c.judgment?'':c.review_cost+'m'}</span>
-    </div>`).join("");
-  const rejected = p.rejected.length ? `
-    <div class="rejected-head">Rejected by the planner</div>
+  const p=await (await fetch("/api/plan")).json();
+  const assignee=c=>c.judgment?"asked, not assigned":c.work_kind==="design"?"Sarah"
+    :c.work_kind==="research"?"research-agent":c.work_kind==="content"?"docs-agent":"impl-agent";
+  const rows=p.commitments.map(c=>`<div class="prow">
+    <div><span class="pt">${esc(c.title)}</span>${c.judgment?'<span class="dtag">Decision</span>':''}
+      <div class="proof ${c.proof_kind==='review'?'review':''}"><span class="k">proof:</span> ${esc(c.proof)}</div>
+      ${c.judgment?'<div class="dnote">this will be asked, not assigned</div>':''}
+      ${c.depends_on.length?`<div class="dnote">after: ${c.depends_on.map(esc).join(', ')}</div>`:''}</div>
+    <span class="assignee">${esc(assignee(c))}</span><span class="pcost">${c.judgment?'':c.review_cost+'m'}</span></div>`).join("");
+  const rej=p.rejected.length?`<div class="rejected-head">Rejected by the planner</div>
     <div class="rej-intro">Work whose completion could not be proven was not planned.</div>
-    <div class="rej-list">${p.rejected.map(r=>`
-      <div class="rrow"><div class="rt">${esc(r.title)}</div>
-        <div class="rr">${esc(r.reason)}</div></div>`).join("")}</div>` : "";
-
-  $("sheet").innerHTML = `
-    <button class="ghost icon close" onclick="closeDecision()" aria-label="Close">✕</button>
+    <div class="rej-list">${p.rejected.map(r=>`<div class="rrow"><div class="rt">${esc(r.title)}</div>
+      <div class="rr">${esc(r.reason)}</div></div>`).join("")}</div>`:"";
+  $("sheet").innerHTML=`<button class="close" onclick="closeSheet()">✕</button>
     <div class="intent">${esc(p.intent)}</div>
     <div class="src">planned by ${esc(p.source)} · ${p.commitments.length} commitments · ${p.rejected.length} refused</div>
-    <div class="plan-list">${rows}</div>
-    ${rejected}
-    <div class="plan-foot">
-      <span class="note">Every commitment carries the check that will prove it. Nothing reaches done on a worker's word.</span>
-      <button class="approve" onclick="closeDecision();tick(3)">Approve ${p.commitments.length} commitments</button>
-    </div>`;
-  $("overlay").hidden = false;
-  document.body.style.overflow = "hidden";
+    <div class="plan-list">${rows}</div>${rej}
+    <div class="plan-foot"><span class="note">Every commitment carries the check that will prove it. Nothing reaches done on a worker's word.</span>
+      <button class="b primary" onclick="closeSheet();tick(3)">Approve ${p.commitments.length} commitments</button></div>`;
+  showSheet();
 }
+function showSheet(){ $("overlay").hidden=false; document.body.style.overflow="hidden"; }
+function closeSheet(){ $("overlay").hidden=true; document.body.style.overflow=""; }
+document.addEventListener("keydown",e=>{ if(e.key==="Escape") closeSheet(); });
 
-// --- team: humans and agents as one roster ---------------------------------
-async function openTeam(){
-  const t = await (await fetch("/api/team")).json();
-  const skillHtml = m => m.skills.map(s=>
-    s.score===null ? `<div class="skill"><span class="sk">${esc(s.kind)}</span> <span class="none">—</span></div>`
-    : `<div class="skill"><span class="sk">${esc(s.kind)}</span> ${Math.round(s.score*100)}% <span class="none">(${s.passes}/${s.total})</span></div>`
-  ).join("");
-  const statusPill = m => m.type!=="agent"
-    ? `<span class="status-pill human">human</span>`
-    : m.probation ? `<span class="status-pill probation">probation</span>`
-    : `<span class="status-pill trusted">trusted</span>`;
-  const rows = t.members.map(m=>`
-    <div class="mrow ${m.principal?'delegate':''}">
-      <div><div class="mn">${esc(m.name)} <span class="kind ${m.type}">${m.type}</span></div>
-        <div class="mp">${esc(m.purpose)}${m.principal
-          ? ` · <span class="princ">acts for ${esc(m.principal.replace('human_',''))}, inherits their scopes, reviewed by them</span>`
-          : m.budget?` · ${m.budget}m review budget`:''}</div></div>
-      <div class="skills">${skillHtml(m)}</div>
-      ${statusPill(m)}
-    </div>`).join("");
-  const hire = t.proposals.map(p=>`
-    <div class="hire"><div class="htag">Hiring proposal</div>
-      <div class="hq">${esc(p.question)}</div>
-      <div class="hopts">${p.options.map(o=>`<button>${esc(o)}</button>`).join("")}</div>
-    </div>`).join("");
+const answer=(id,choice)=>{ closeSheet(); return post("/api/answer",{decision_id:id,choice}); };
+const tick=ticks=>post("/api/tick",{ticks});
 
-  $("sheet").innerHTML = `
-    <button class="ghost icon close" onclick="closeDecision()" aria-label="Close">✕</button>
-    <div class="d-q" style="font-size:26px;margin-bottom:20px">Team</div>
-    ${hire}
-    <div class="roster">${rows}</div>
-    <div class="prob-note"><div class="h">Probation</div>
-      <p>New teammates start with no trust. Everything they claim is deeply verified until they earn a lighter check. Graduation is on evidence, not time served.</p></div>`;
-  $("overlay").hidden = false;
-  document.body.style.overflow = "hidden";
-}
+/* ---- theme ---- */
+function applyTheme(dark){ document.documentElement.classList.toggle("dk",dark);
+  const t=$("theme"); if(t) t.firstElementChild.textContent = dark?"◑":"◐"; }
+function toggleTheme(){ const dark=!document.documentElement.classList.contains("dk");
+  applyTheme(dark); try{localStorage.setItem("conductor-theme",dark?"dark":"light");}catch(e){} }
 
-document.addEventListener("keydown", e=>{ if(e.key==="Escape") closeDecision(); });
+/* ---- data ---- */
+async function load(){ try{ S=await (await fetch("/api/state")).json();
+  $("nav-badge").textContent=S.decisions.length; $("nav-badge").classList.toggle("zero",!S.decisions.length);
+  if(VIEW!=="team") draw(); }catch(e){} }
+async function post(path,body){ const r=await fetch(path,{method:"POST",
+  headers:{"Content-Type":"application/json"},body:JSON.stringify(body)}); S=await r.json();
+  if(VIEW==="team") viewTeam(); else draw(); }
 
-// Theme: dark is native. Respect a saved choice, else the OS, and let the
-// toggle override. localStorage may throw in some embeds, so guard it.
-function applyTheme(dark){
-  document.documentElement.classList.toggle("dk", dark);
-  const t = $("theme"); if (t) t.textContent = dark ? "◑" : "◐";
-}
-function toggleTheme(){
-  const dark = !document.documentElement.classList.contains("dk");
-  applyTheme(dark);
-  try{ localStorage.setItem("conductor-theme", dark?"dark":"light"); }catch(e){}
-}
-// The head script already set the class before paint; just sync the icon.
 applyTheme(document.documentElement.classList.contains("dk"));
-
-// Deep links, used for capturing each screen: ?open=plan or ?open=decision.
-async function bootScreen(){
+(async function boot(){
   await load();
-  const q = new URLSearchParams(location.search);
-  if (q.get("theme")==="dark") applyTheme(true);
-  if (q.get("theme")==="light") applyTheme(false);
-  const open = q.get("open");
-  if (open==="plan") openPlan();
-  else if (open==="team") openTeam();
-  else if (open==="decision"){
-    const s = await (await fetch("/api/state")).json();
-    const d = s.decisions.find(d=>d.branches) || s.decisions[0];
-    if (d) openDecision(d.id);
-  }
-}
-bootScreen();
+  const q=new URLSearchParams(location.search);
+  if(q.get("theme")==="dark") applyTheme(true);
+  if(q.get("theme")==="light") applyTheme(false);
+  const v=q.get("view"); if(v) go(v);
+  const open=q.get("open");
+  if(open==="plan") openPlan();
+  else if(open==="team") go("team");
+  else if(open==="decision"){ const d=(S.decisions.find(d=>d.branches)||S.decisions[0]); if(d) openDecision(d.id); }
+})();
 setInterval(()=>{ if($("overlay").hidden) load(); }, 4000);
 </script>
