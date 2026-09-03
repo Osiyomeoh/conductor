@@ -11,7 +11,7 @@
   --e1:rgba(10,12,20,.015); --e2:rgba(10,12,20,.04); --e3:rgba(10,12,20,.07);
   --line:rgba(10,12,20,.09); --line-strong:rgba(10,12,20,.14);
   --t1:#12151c; --t2:#5b6472; --t3:#8b93a1;
-  --accent:#4c5fd7; --accent-soft:rgba(76,95,215,.10);
+  --accent:#0d9aa2; --accent-soft:rgba(13,154,162,.10);
   --pass:#0f9d76; --pass-bg:rgba(15,157,118,.10);
   --fail:#d1462a; --fail-bg:rgba(209,70,42,.10); --fail-wash:rgba(209,70,42,.055);
   --held:#b0791a; --held-bg:rgba(176,121,26,.12);
@@ -19,11 +19,11 @@
   --sans:"Inter",-apple-system,system-ui,"Segoe UI",sans-serif;
 }
 .dk{
-  --ground:#08090a; --surface:#0f1011; --side:#0b0c0d;
+  --ground:#070b0d; --surface:#0d1214; --side:#0b0c0d;
   --e1:rgba(255,255,255,.02); --e2:rgba(255,255,255,.05); --e3:rgba(255,255,255,.08);
   --line:rgba(255,255,255,.08); --line-strong:rgba(255,255,255,.12);
   --t1:#f7f8f8; --t2:#8a8f98; --t3:#62666d;
-  --accent:#6f7ff0; --accent-soft:rgba(111,127,240,.12);
+  --accent:#22cfd6; --accent-soft:rgba(34,207,214,.14);
   --pass:#3fd68a; --pass-bg:rgba(39,166,68,.10);
   --fail:#f34e52; --fail-bg:rgba(243,78,82,.10); --fail-wash:rgba(243,78,82,.06);
   --held:#f7bf8b; --held-bg:rgba(247,191,139,.10);
@@ -74,9 +74,9 @@ body{background:var(--ground);color:var(--t1);font-family:var(--sans);
 .loopchip{display:flex;align-items:center;gap:8px;padding:6px 9px;font-family:var(--mono);
   font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--t3)}
 .dot{width:6px;height:6px;border-radius:50%;background:var(--accent);flex:none;
-  box-shadow:0 0 0 0 rgba(111,127,240,.5);animation:pulse 2.4s ease-out infinite}
-@keyframes pulse{0%{box-shadow:0 0 0 0 rgba(111,127,240,.45)}
-  70%{box-shadow:0 0 0 8px rgba(111,127,240,0)}100%{box-shadow:0 0 0 0 rgba(111,127,240,0)}}
+  box-shadow:0 0 0 0 rgba(34,207,214,.5);animation:pulse 2.4s ease-out infinite}
+@keyframes pulse{0%{box-shadow:0 0 0 0 rgba(34,207,214,.45)}
+  70%{box-shadow:0 0 0 8px rgba(34,207,214,0)}100%{box-shadow:0 0 0 0 rgba(34,207,214,0)}}
 @media(prefers-reduced-motion:reduce){.dot{animation:none}}
 
 /* content */

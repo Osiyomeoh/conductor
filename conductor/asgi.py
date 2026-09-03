@@ -23,7 +23,7 @@ from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
 from .auth import Principal, auth_required, mint_session, principal_from
 from .config import CONFIG
 from .registry import Registry
-from .server import LANDING, UI, UI_DIR, decision_detail, state, team
+from .server import LANDING, ONBOARDING, UI, UI_DIR, decision_detail, state, team
 from .world import persistent
 
 log = logging.getLogger("conductor.asgi")
@@ -138,6 +138,12 @@ def shot(name: str):
 @app.get("/", response_class=HTMLResponse)
 def landing():
     return HTMLResponse(open(LANDING).read())
+
+
+@app.get("/signup", response_class=HTMLResponse)
+@app.get("/onboarding", response_class=HTMLResponse)
+def onboarding():
+    return HTMLResponse(open(ONBOARDING).read())
 
 
 @app.get("/{path:path}", response_class=HTMLResponse)

@@ -1,0 +1,249 @@
+<!doctype html>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Set up Conductor</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap">
+<style>
+:root{
+  --ground:#070b0d; --panel:#0c0d0f; --surface:#141519;
+  --e1:rgba(255,255,255,.03); --e2:rgba(255,255,255,.06); --e3:rgba(255,255,255,.09);
+  --line:rgba(255,255,255,.08); --line-strong:rgba(255,255,255,.14);
+  --t1:#f7f8f8; --t2:#9096a0; --t3:#5f636b;
+  --accent:#22cfd6;
+  --pass:#3fd68a; --fail:#f34e52; --held:#f7bf8b;
+  --mono:"JetBrains Mono",ui-monospace,Menlo,monospace;
+  --sans:"Inter",-apple-system,system-ui,"Segoe UI",sans-serif;
+}
+*{box-sizing:border-box;margin:0}
+[hidden]{display:none!important}
+html,body{height:100%}
+body{background:var(--ground);color:var(--t1);font-family:var(--sans);font-size:15px;
+  line-height:1.55;-webkit-font-smoothing:antialiased;letter-spacing:-.006em}
+.mono{font-family:var(--mono)}
+
+.split{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.05fr);height:100vh}
+@media(max-width:860px){.split{grid-template-columns:1fr}.right{display:none}}
+
+/* left: the form */
+.left{position:relative;display:flex;flex-direction:column;padding:44px 56px}
+.brand{display:flex;align-items:center;gap:9px;font-weight:600;font-size:15px}
+.mark{width:24px;height:24px;border-radius:7px;background:var(--accent);display:grid;
+  place-items:center;color:#04191b;font-family:var(--mono);font-size:13px;font-weight:600}
+.formwrap{flex:1;display:flex;flex-direction:column;justify-content:center;max-width:440px}
+.step{animation:rise .35s ease}
+@keyframes rise{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+h1{font-size:30px;font-weight:600;letter-spacing:-.022em;line-height:1.1}
+.lede{color:var(--t2);font-size:15px;margin-top:9px}
+.field{margin-top:22px}
+.field label{display:block;font-family:var(--mono);font-size:10.5px;letter-spacing:.08em;
+  text-transform:uppercase;color:var(--t3);margin-bottom:8px}
+.input,.select{width:100%;background:var(--e1);border:1px solid var(--line);border-radius:10px;
+  padding:12px 14px;color:var(--t1);font-family:var(--sans);font-size:14.5px;outline:none;transition:.14s}
+.input:focus,.select:focus{border-color:var(--accent);background:var(--e2)}
+.input::placeholder{color:var(--t3)}
+.urlrow{display:flex;align-items:stretch;border:1px solid var(--line);border-radius:10px;overflow:hidden;background:var(--e1)}
+.urlrow .pfx{padding:12px 12px;color:var(--t3);font-family:var(--mono);font-size:13.5px;
+  background:var(--e2);border-right:1px solid var(--line);white-space:nowrap}
+.urlrow input{flex:1;background:transparent;border:0;padding:12px 14px;color:var(--t1);
+  font-family:var(--sans);font-size:14.5px;outline:none}
+.select{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath d='M3 5l3 3 3-3' stroke='%235f636b' stroke-width='1.4' fill='none'/%3E%3C/svg%3E");
+  background-repeat:no-repeat;background-position:right 14px center}
+.rowfields{display:flex;gap:12px}.rowfields>*{flex:1}
+.connect{border:1px solid var(--line);border-radius:12px;overflow:hidden;margin-top:22px}
+.crow{padding:15px 16px;border-top:1px solid var(--line)}
+.crow:first-child{border-top:0}
+.crow h4{font-size:14px;font-weight:500}
+.crow p{color:var(--t2);font-size:12.5px;margin-top:2px}
+.toggle{display:flex;align-items:center;justify-content:space-between;gap:14px}
+.sw{width:38px;height:22px;border-radius:9999px;background:var(--e3);position:relative;
+  cursor:pointer;flex:none;transition:.18s}
+.sw.on{background:var(--accent)}
+.sw i{position:absolute;top:3px;left:3px;width:16px;height:16px;border-radius:50%;
+  background:#fff;transition:.18s}
+.sw.on i{left:19px}
+.actions{display:flex;align-items:center;gap:14px;margin-top:30px}
+.btn{font-family:var(--sans);font-size:14px;font-weight:500;cursor:pointer;border-radius:10px;
+  padding:11px 20px;border:1px solid var(--line);background:var(--e2);color:var(--t1);transition:.13s}
+.btn:hover{background:var(--e3);border-color:var(--line-strong)}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:#04191b;font-weight:600}
+.btn.primary:hover{filter:brightness(1.09)}
+.btn.ghost{background:transparent;border-color:transparent;color:var(--t2)}
+.btn.ghost:hover{color:var(--t1)}
+.sso{display:flex;gap:10px;margin-top:22px}
+.sso button{flex:1;display:flex;align-items:center;justify-content:center;gap:8px;padding:11px;
+  border:1px solid var(--line);border-radius:10px;background:var(--e1);color:var(--t1);
+  font-family:var(--sans);font-size:13.5px;cursor:pointer;transition:.13s}
+.sso button:hover{background:var(--e2)}
+.dots{display:flex;gap:7px;margin-top:auto;padding-top:28px}
+.dot{width:22px;height:5px;border-radius:9999px;background:var(--e3);transition:.25s}
+.dot.on{background:var(--accent);width:30px}
+.dot.done{background:var(--t3)}
+.foot{color:var(--t3);font-size:12px;margin-top:14px}
+
+/* right: atmospheric product preview */
+.right{position:relative;background:var(--panel);border-left:1px solid var(--line);overflow:hidden}
+.glow{position:absolute;top:-15%;right:-10%;width:70%;height:60%;
+  background:radial-gradient(ellipse at center,rgba(34,207,214,.20),transparent 65%);filter:blur(10px)}
+.preview{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;padding:60px}
+.pcard{width:100%;max-width:520px;background:var(--surface);border:1px solid var(--line);
+  border-radius:16px;box-shadow:0 40px 120px rgba(0,0,0,.5);transform:perspective(1400px) rotateY(-11deg) rotateX(3deg);
+  overflow:hidden}
+.pbar{display:flex;align-items:center;gap:6px;padding:12px 15px;border-bottom:1px solid var(--line)}
+.pbar i{width:10px;height:10px;border-radius:50%;background:var(--e3)}
+.plive{margin-left:auto;display:flex;align-items:center;gap:7px;font-family:var(--mono);
+  font-size:9.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--t3)}
+.plive .d{width:6px;height:6px;border-radius:50%;background:var(--pass);
+  box-shadow:0 0 0 0 rgba(63,214,138,.5);animation:pp 2.2s ease-out infinite}
+@keyframes pp{0%{box-shadow:0 0 0 0 rgba(63,214,138,.45)}70%{box-shadow:0 0 0 7px rgba(63,214,138,0)}100%{box-shadow:0 0 0 0 rgba(63,214,138,0)}}
+.pbody{padding:22px}
+.ptitle{font-size:20px;font-weight:600;letter-spacing:-.02em}
+.pfigs{display:flex;gap:22px;margin:16px 0 20px}
+.pf b{font-family:var(--mono);font-size:22px;font-weight:500;display:block}
+.pf.fail b{color:var(--fail)} .pf.held b{color:var(--held)}
+.pf span{font-family:var(--mono);font-size:9px;letter-spacing:.08em;text-transform:uppercase;color:var(--t3)}
+.prow{display:grid;grid-template-columns:80px 1fr;gap:10px;align-items:center;padding:10px 0;
+  border-top:1px solid var(--line)}
+.pchip{font-family:var(--mono);font-size:9px;letter-spacing:.05em;text-transform:uppercase;
+  padding:3px 8px;border-radius:9999px;justify-self:start}
+.pc-done{color:var(--pass);background:rgba(39,166,68,.10)}
+.pc-fail{color:var(--fail);background:rgba(243,78,82,.10)}
+.pc-held{color:var(--held);background:rgba(247,191,139,.10)}
+.pt{font-size:12.5px;font-weight:500}
+.pw{font-family:var(--mono);font-size:10px;color:var(--t3);margin-top:2px}
+@media(prefers-reduced-motion:reduce){.plive .d{animation:none}}
+</style>
+
+<div class="split">
+  <div class="left">
+    <div class="brand"><span class="mark">C</span> Conductor</div>
+    <div class="formwrap"><div id="step" class="step"></div>
+      <div class="dots" id="dots"></div>
+    </div>
+  </div>
+  <div class="right">
+    <div class="glow"></div>
+    <div class="preview"><div class="pcard">
+      <div class="pbar"><i></i><i></i><i></i>
+        <span class="plive"><span class="d"></span> loop running</span></div>
+      <div class="pbody">
+        <div class="ptitle" id="pvTitle">One thing needs you.</div>
+        <div class="pfigs">
+          <div class="pf fail"><b id="pvCaught">3</b><span>caught wrong</span></div>
+          <div class="pf"><b id="pvVer">6</b><span>verified</span></div>
+          <div class="pf held"><b>1</b><span>held</span></div>
+        </div>
+        <div class="prow"><span class="pchip pc-done">done</span>
+          <div><div class="pt">Fix the payment webhook retry</div>
+            <div class="pw">grep -q RETRY_OK webhook.txt · passed</div></div></div>
+        <div class="prow"><span class="pchip pc-fail">rejected</span>
+          <div><div class="pt">Implement slugify(text)</div>
+            <div class="pw">not lowercased — caught, re-dispatched</div></div></div>
+        <div class="prow"><span class="pchip pc-held">held</span>
+          <div><div class="pt">Migrate the onboarding events table</div>
+            <div class="pw">reviewer has 0m left · waiting</div></div></div>
+      </div>
+    </div></div>
+  </div>
+</div>
+
+<script>
+const $ = id => document.getElementById(id);
+const esc = s => String(s ?? "").replace(/[<>&"]/g,c=>({"<":"&lt;",">":"&gt;","&":"&amp;",'"':"&quot;"}[c]));
+const store = {}; // prototype only; nothing leaves the browser
+function save(k,v){ store[k]=v; try{localStorage.setItem("conductor-onb-"+k, v);}catch(e){} }
+
+const steps = [
+  {
+    title: "Create your workspace",
+    lede: "One place where your team and its agents move work forward.",
+    html: `
+      <div class="sso">
+        <button onclick="next()">${g()} Google</button>
+        <button onclick="next()">${gh()} GitHub</button>
+      </div>
+      <div class="field"><label>Workspace name</label>
+        <input class="input" id="ws" placeholder="Acme" oninput="save('ws',this.value)"></div>
+      <div class="field"><label>Workspace URL</label>
+        <div class="urlrow"><span class="pfx">conductor.app/</span>
+          <input id="url" placeholder="acme" oninput="save('url',this.value)"></div></div>
+      <div class="rowfields">
+        <div class="field"><label>Region</label>
+          <select class="select"><option>United States</option><option>European Union</option></select></div>
+      </div>`,
+    primary: "Create workspace",
+  },
+  {
+    title: "Set up your profile",
+    lede: "How you appear to your team and to the agents you supervise.",
+    html: `
+      <div class="field"><label>Full name</label>
+        <input class="input" id="name" placeholder="Samuel Aleonomoh" oninput="save('name',this.value)"></div>
+      <div class="field"><label>Title</label>
+        <input class="input" placeholder="Founder"></div>`,
+    primary: "Continue", skip: true,
+  },
+  {
+    title: "Invite your team",
+    lede: "Humans and agents work side by side. Bring the humans first.",
+    html: `
+      <div class="field"><label>Email addresses</label>
+        <input class="input" placeholder="you@team.com, teammate@team.com"></div>
+      <div class="foot">You can also share a link. Agents are added later, from the roster.</div>`,
+    primary: "Send invitations", skip: true,
+  },
+  {
+    title: "Connect your repository",
+    lede: "Agents do real work in real branches. Conductor merges only what passes its checks.",
+    html: `
+      <div class="connect">
+        <div class="crow"><h4>Real execution</h4><p>Each task runs in its own git worktree.</p></div>
+        <div class="crow"><h4>Verified merges</h4><p>Nothing reaches your base branch on a worker's word.</p></div>
+        <div class="crow"><h4>Trust that compounds</h4><p>Agents earn a lighter check as they prove out.</p></div>
+      </div>
+      <div class="sso"><button onclick="next()">${gh()} Connect GitHub</button></div>`,
+    primary: "Continue", skip: true,
+  },
+  {
+    title: "You're set.",
+    lede: "Conductor runs the loop and surfaces only the decisions that need you. On a good day, it stays quiet.",
+    html: `
+      <div class="connect">
+        <div class="crow toggle"><div><h4>Weekly digest</h4>
+          <p>What was verified, caught, and decided.</p></div>
+          <div class="sw on" onclick="this.classList.toggle('on')"><i></i></div></div>
+        <div class="crow toggle"><div><h4>Escalation alerts</h4>
+          <p>Ping me the moment a real decision is waiting.</p></div>
+          <div class="sw on" onclick="this.classList.toggle('on')"><i></i></div></div>
+      </div>`,
+    primary: "Enter Conductor", finish: true,
+  },
+];
+
+let i = 0;
+function render(){
+  const s = steps[i];
+  $("step").innerHTML = `
+    <h1>${esc(s.title)}</h1><p class="lede">${esc(s.lede)}</p>
+    ${s.html}
+    <div class="actions">
+      ${s.skip ? `<button class="btn ghost" onclick="next()">Skip</button>` : ""}
+      <button class="btn primary" onclick="next()">${esc(s.primary)}</button>
+    </div>`;
+  // re-run the entrance animation
+  $("step").style.animation = "none"; void $("step").offsetWidth; $("step").style.animation = "";
+  $("dots").innerHTML = steps.map((_,k)=>
+    `<span class="dot ${k===i?'on':k<i?'done':''}"></span>`).join("");
+  // preview reacts subtly to the last step
+  if (steps[i].finish){ $("pvTitle").textContent = "Nothing needs you."; }
+}
+function next(){
+  if (steps[i].finish){ location.href = "/app"; return; }
+  i++; render();
+}
+// tiny inline brand glyphs
+function g(){ return `<svg width="15" height="15" viewBox="0 0 24 24"><path fill="#fff" d="M23 12.3c0-.8-.1-1.6-.2-2.3H12v4.5h6.2a5.3 5.3 0 0 1-2.3 3.5v2.9h3.7c2.2-2 3.4-5 3.4-8.6z"/><path fill="#fff" d="M12 24c3.1 0 5.7-1 7.6-2.8l-3.7-2.9c-1 .7-2.3 1.1-3.9 1.1-3 0-5.5-2-6.4-4.7H1.8v3C3.7 21.4 7.5 24 12 24z" opacity=".8"/></svg>`; }
+function gh(){ return `<svg width="15" height="15" viewBox="0 0 24 24" fill="#fff"><path d="M12 .5A11.5 11.5 0 0 0 .5 12a11.5 11.5 0 0 0 7.9 10.9c.6.1.8-.2.8-.5v-2c-3.2.7-3.9-1.4-3.9-1.4-.5-1.3-1.3-1.7-1.3-1.7-1-.7.1-.7.1-.7 1.2.1 1.8 1.2 1.8 1.2 1 1.8 2.8 1.3 3.5 1 .1-.8.4-1.3.7-1.6-2.6-.3-5.3-1.3-5.3-5.7 0-1.3.4-2.3 1.2-3.1-.1-.3-.5-1.5.1-3.1 0 0 1-.3 3.3 1.2a11.5 11.5 0 0 1 6 0C17 4.6 18 4.9 18 4.9c.6 1.6.2 2.8.1 3.1.8.8 1.2 1.8 1.2 3.1 0 4.4-2.7 5.4-5.3 5.7.4.4.8 1.1.8 2.2v3.3c0 .3.2.6.8.5A11.5 11.5 0 0 0 23.5 12 11.5 11.5 0 0 0 12 .5z"/></svg>`; }
+render();
+</script>

@@ -25,6 +25,7 @@ log = logging.getLogger("conductor.server")
 UI_DIR = os.path.join(os.path.dirname(__file__), "ui")
 UI = os.path.join(UI_DIR, "index.html")
 LANDING = os.path.join(UI_DIR, "landing.html")
+ONBOARDING = os.path.join(UI_DIR, "onboarding.html")
 
 _ORDER = [Status.ESCALATED, Status.REJECTED, Status.HELD, Status.DISPATCHED,
           Status.CLAIMED_DONE, Status.PENDING, Status.DONE, Status.BLOCKED]
@@ -235,6 +236,9 @@ def serve(conductor, port: int = 7616, open_browser: bool = True):
                         self._send(200, f.read(), "image/png")
                 else:
                     self._send(404, json.dumps({"error": "no shot"}))
+            elif self.path.split("?")[0] in ("/signup", "/onboarding"):
+                with open(ONBOARDING, "rb") as f:
+                    self._send(200, f.read(), "text/html; charset=utf-8")
             elif self.path.split("?")[0] in ("/", "/index.html"):
                 with open(LANDING, "rb") as f:
                     self._send(200, f.read(), "text/html; charset=utf-8")
