@@ -25,10 +25,12 @@ Resources:
   AutoScaling:
     Type: AWS::AppRunner::AutoScalingConfiguration
     Properties:
-      AutoScalingConfigurationName: conductor-web
+      AutoScalingConfigurationName: conductor-web1
+      # State is in-memory, so every viewer must hit the same instance. Pin to a
+      # single instance (min = max = 1) so the board a judge sees is coherent.
       MinSize: 1
-      MaxSize: 2
-      MaxConcurrency: 50
+      MaxSize: 1
+      MaxConcurrency: 100
 
   Service:
     Type: AWS::AppRunner::Service

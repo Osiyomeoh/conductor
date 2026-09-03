@@ -53,5 +53,14 @@ class Registry:
         with e.lock:
             return fn(e.conductor)
 
+    def reset(self, tenant: str, fn=None):
+        """Rebuild a tenant's conductor from a fresh seed, discarding in-memory
+        state. Used by the guided demo so every visitor starts from the same
+        clean board. Holds the tenant's lock so no tick races the rebuild."""
+        e = self._entry(tenant)
+        with e.lock:
+            e.conductor = self.build_fn(CONFIG.store(), tenant)
+            return fn(e.conductor) if fn else None
+
     def tenants(self) -> list[str]:
         return list(self._entries)

@@ -94,7 +94,17 @@ def api_plan(p: Principal = Depends(caller)):
 
 @app.get("/api/decision")
 def api_decision(id: str, p: Principal = Depends(caller)):
-    return registry.read(p.tenant, lambda c: decision_detail(c, id))
+    detail = registry.read(p.tenant, lambda c: decision_detail(c, id))
+    if isinstance(detail, dict) and detail.get("error"):
+        raise HTTPException(status_code=404, detail="unknown decision")
+    return detail
+
+
+@app.post("/api/reset")
+def api_reset(p: Principal = Depends(caller)):
+    """Rebuild this tenant from a fresh seed. The guided demo calls this so a
+    cold visitor always starts from the same clean board."""
+    return registry.reset(p.tenant, lambda c: state(c))
 
 
 @app.post("/api/tick")

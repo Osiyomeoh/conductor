@@ -9,11 +9,11 @@ body{background:var(--ground);color:var(--t1);font-family:var(--sans);font-size:
 @media(max-width:860px){.split{grid-template-columns:1fr}.right{display:none}}
 
 /* left: the form */
-.left{position:relative;display:flex;flex-direction:column;padding:44px 56px}
-.brand{display:flex;align-items:center;gap:9px;font-weight:600;font-size:15px}
+.left{position:relative;display:flex;flex-direction:column;padding:30px 56px 44px}
+.brand{display:flex;align-items:center;gap:9px;font-weight:600;font-size:15px;margin-bottom:14px}
 .mark{width:24px;height:24px;border-radius:7px;background:var(--accent);display:grid;
   place-items:center;color:#04191b;font-family:var(--mono);font-size:13px;font-weight:600}
-.formwrap{flex:1;display:flex;flex-direction:column;justify-content:center;max-width:440px}
+.formwrap{flex:1;display:flex;flex-direction:column;justify-content:center;max-width:440px;padding-top:18px}
 .step{animation:rise .35s ease}
 @keyframes rise{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
 .split h1{font-size:30px;font-weight:600;letter-spacing:-.022em;line-height:1.1}
