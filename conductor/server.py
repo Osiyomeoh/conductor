@@ -143,7 +143,11 @@ def serve(conductor, port: int = 7616, open_browser: bool = True):
             self.wfile.write(b)
 
         def do_GET(self):
-            if self.path.startswith("/api/decision"):
+            if self.path.startswith("/api/plan"):
+                from .planning import propose
+                with lock:
+                    self._send(200, json.dumps(propose()))
+            elif self.path.startswith("/api/decision"):
                 from urllib.parse import parse_qs, urlparse
                 did = parse_qs(urlparse(self.path).query).get("id", [""])[0]
                 with lock:

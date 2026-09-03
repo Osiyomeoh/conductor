@@ -64,6 +64,36 @@ class SprintPlan(BaseModel):
     open_questions: list[str] = Field(default_factory=list)
 
 
+_KIND = {"command": EvidenceKind.COMMAND, "file": EvidenceKind.FILE_EXISTS,
+         "http": EvidenceKind.HTTP_OK, "review": EvidenceKind.HUMAN_REVIEW}
+
+
+def materialise(plan: SprintPlan) -> tuple[list[Commitment], list[tuple[str, str]]]:
+    """Turn a plan into commitments, refusing any whose proof is weak.
+
+    This is a plain function, not a method, so the same evidence gate runs
+    whether the plan came from the live Planner agent or from a fixture. The
+    rejection is genuinely computed either way: a fixture cannot fake its way
+    past `evidence_quality`."""
+    made: dict[str, Commitment] = {}
+    rejected: list[tuple[str, str]] = []
+    for pc in plan.commitments:
+        kind = _KIND.get(pc.evidence_kind.lower(), EvidenceKind.NONE)
+        ev = Evidence(kind, spec=pc.evidence_spec, description=pc.evidence_description)
+        ok, why = evidence_quality(ev)
+        if not ok:
+            rejected.append((pc.title, why))
+            continue
+        made[pc.title] = Commitment.new(
+            pc.title, ev, work_kind=pc.work_kind,
+            review_cost_minutes=pc.review_cost_minutes,
+            ambiguous=pc.ambiguous, consequential=pc.consequential, options=pc.options)
+    for pc in plan.commitments:
+        if pc.title in made:
+            made[pc.title].dependencies = [made[d].id for d in pc.depends_on if d in made]
+    return list(made.values()), rejected
+
+
 class PlannerAgent:
     def __init__(self, temperature: float = 0.2):
         from strands import Agent
@@ -75,24 +105,5 @@ class PlannerAgent:
         return self.agent.structured_output(SprintPlan, intent)
 
     def to_commitments(self, plan: SprintPlan) -> tuple[list[Commitment], list[str]]:
-        """Materialise the plan, refusing any commitment whose proof is weak."""
-        made: dict[str, Commitment] = {}
-        rejected: list[str] = []
-        for pc in plan.commitments:
-            kind = {"command": EvidenceKind.COMMAND, "file": EvidenceKind.FILE_EXISTS,
-                    "http": EvidenceKind.HTTP_OK, "review": EvidenceKind.HUMAN_REVIEW,
-                    }.get(pc.evidence_kind.lower(), EvidenceKind.NONE)
-            ev = Evidence(kind, spec=pc.evidence_spec, description=pc.evidence_description)
-            ok, why = evidence_quality(ev)
-            if not ok:
-                rejected.append(f"{pc.title}: {why}")
-                continue
-            cm = Commitment.new(pc.title, ev, work_kind=pc.work_kind,
-                                review_cost_minutes=pc.review_cost_minutes,
-                                ambiguous=pc.ambiguous, consequential=pc.consequential,
-                                options=pc.options)
-            made[pc.title] = cm
-        for pc in plan.commitments:
-            if pc.title in made:
-                made[pc.title].dependencies = [made[d].id for d in pc.depends_on if d in made]
-        return list(made.values()), rejected
+        made, rejected = materialise(plan)
+        return made, [f"{t}: {w}" for t, w in rejected]

@@ -189,6 +189,39 @@ section{margin-bottom:30px}
 .folded ul{list-style:none;padding:0;margin:12px 0 0}
 .folded li{font-family:var(--mono);font-size:11.5px;color:var(--t2);padding:4px 0}
 .folded li span{color:var(--t3)}
+
+/* plan review */
+.intent{font-size:20px;font-weight:600;letter-spacing:-.015em;line-height:1.4;
+  color:var(--t2);text-wrap:pretty}
+.intent::before{content:"“"} .intent::after{content:"”"}
+.src{font-family:var(--mono);font-size:11px;color:var(--t3);margin-top:10px}
+.plan-list{margin-top:22px;border:1px solid var(--line);border-radius:12px;overflow:hidden}
+.prow{display:grid;grid-template-columns:1fr auto auto;gap:16px;align-items:start;
+  padding:14px 16px;border-top:1px solid var(--line)}
+.prow:first-child{border-top:0}
+.prow .pt{font-size:14px;font-weight:500;letter-spacing:-.008em}
+.proof{font-family:var(--mono);font-size:11.5px;color:var(--t2);margin-top:5px;
+  display:flex;gap:6px;align-items:baseline}
+.proof .k{color:var(--pass);flex:none}
+.proof.review .k{color:var(--held)}
+.assignee{font-family:var(--mono);font-size:11px;color:var(--t2);
+  border:1px solid var(--line);border-radius:9999px;padding:3px 10px;white-space:nowrap}
+.pcost{font-family:var(--mono);font-size:11px;color:var(--t3);white-space:nowrap;padding-top:3px}
+.dtag{font-family:var(--mono);font-size:9.5px;letter-spacing:.05em;text-transform:uppercase;
+  color:var(--held);background:var(--held-bg);padding:2px 8px;border-radius:9999px;margin-left:8px;
+  vertical-align:1px}
+.dnote{color:var(--t3);font-size:11px;margin-top:4px}
+.rejected-head{font-family:var(--mono);font-size:11px;letter-spacing:.1em;text-transform:uppercase;
+  color:var(--t3);margin:26px 0 4px}
+.rej-intro{color:var(--t2);font-size:13px;margin-bottom:10px}
+.rej-list{border:1px solid var(--line);border-radius:12px;overflow:hidden}
+.rrow{padding:12px 16px;border-top:1px solid var(--line);background:var(--fail-wash)}
+.rrow:first-child{border-top:0}
+.rrow .rt{font-size:13.5px;font-weight:500}
+.rrow .rr{font-family:var(--mono);font-size:11.5px;color:var(--fail);margin-top:4px}
+.plan-foot{display:flex;justify-content:space-between;align-items:center;gap:16px;margin-top:26px}
+.plan-foot .approve{background:var(--accent);border-color:var(--accent);color:#fff;padding:11px 20px}
+.plan-foot .approve:hover{filter:brightness(1.08)}
 ::-webkit-scrollbar{width:8px;height:8px}
 ::-webkit-scrollbar-thumb{background:var(--e3);border-radius:9999px}
 </style>
@@ -204,6 +237,7 @@ section{margin-bottom:30px}
   <div class="controls">
     <span class="compression" id="compression"></span>
     <button class="ghost icon" id="theme" onclick="toggleTheme()" aria-label="Toggle theme">◐</button>
+    <button class="ghost" onclick="openPlan()">Plan a sprint</button>
     <button class="ghost" onclick="tick(1)">Advance tick</button>
     <button onclick="tick(6)">Run six</button>
   </div>
@@ -400,6 +434,46 @@ function closeDecision(){
   $("overlay").hidden = true;
   document.body.style.overflow = "";
 }
+// --- plan review: the one moment a person shapes the work ------------------
+async function openPlan(){
+  const p = await (await fetch("/api/plan")).json();
+  const assignee = c =>
+    c.judgment ? "asked, not assigned"
+    : c.work_kind==="design" ? "Sarah"
+    : c.work_kind==="research" ? "research-agent"
+    : c.work_kind==="content" ? "docs-agent"
+    : "impl-agent";
+  const rows = p.commitments.map(c=>`
+    <div class="prow">
+      <div><span class="pt">${esc(c.title)}</span>${c.judgment?'<span class="dtag">Decision</span>':''}
+        <div class="proof ${c.proof_kind==='review'?'review':''}">
+          <span class="k">proof:</span> ${esc(c.proof)}</div>
+        ${c.judgment?'<div class="dnote">this will be asked, not assigned</div>':''}
+        ${c.depends_on.length?`<div class="dnote">after: ${c.depends_on.map(esc).join(', ')}</div>`:''}</div>
+      <span class="assignee">${esc(assignee(c))}</span>
+      <span class="pcost">${c.judgment?'':c.review_cost+'m'}</span>
+    </div>`).join("");
+  const rejected = p.rejected.length ? `
+    <div class="rejected-head">Rejected by the planner</div>
+    <div class="rej-intro">Work whose completion could not be proven was not planned.</div>
+    <div class="rej-list">${p.rejected.map(r=>`
+      <div class="rrow"><div class="rt">${esc(r.title)}</div>
+        <div class="rr">${esc(r.reason)}</div></div>`).join("")}</div>` : "";
+
+  $("sheet").innerHTML = `
+    <button class="ghost icon close" onclick="closeDecision()" aria-label="Close">✕</button>
+    <div class="intent">${esc(p.intent)}</div>
+    <div class="src">planned by ${esc(p.source)} · ${p.commitments.length} commitments · ${p.rejected.length} refused</div>
+    <div class="plan-list">${rows}</div>
+    ${rejected}
+    <div class="plan-foot">
+      <span class="note">Every commitment carries the check that will prove it. Nothing reaches done on a worker's word.</span>
+      <button class="approve" onclick="closeDecision();tick(3)">Approve ${p.commitments.length} commitments</button>
+    </div>`;
+  $("overlay").hidden = false;
+  document.body.style.overflow = "hidden";
+}
+
 document.addEventListener("keydown", e=>{ if(e.key==="Escape") closeDecision(); });
 
 // Theme: dark is native. Respect a saved choice, else the OS, and let the

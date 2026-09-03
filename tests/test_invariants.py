@@ -330,3 +330,27 @@ def test_review_cost_does_not_compound_across_retries():
         d.dispatch(c)
         seen.append(c.review_cost_minutes)
     assert set(seen) == {80}, seen
+
+
+# --- planning ---------------------------------------------------------------
+
+def test_planner_refuses_unprovable_work():
+    """The plan review screen's core claim: work whose completion cannot be
+    proven is refused at plan time, by the same gate the live agent uses."""
+    from conductor.planning import propose
+    p = propose()
+    titles = {r["title"] for r in p["rejected"]}
+    assert "Improve onboarding" in titles          # no evidence
+    assert "Tidy up the codebase" in titles         # trivial check
+    reasons = " ".join(r["reason"] for r in p["rejected"])
+    assert "no evidence" in reasons
+    assert "trivial" in reasons or "proves nothing" in reasons
+
+
+def test_judgment_calls_are_marked_not_assigned():
+    from conductor.planning import propose
+    p = propose()
+    decisions = [c for c in p["commitments"] if c["judgment"]]
+    assert decisions, "expected at least one judgment call in the plan"
+    for d in decisions:
+        assert d["options"] or d["proof_kind"] == "review"
