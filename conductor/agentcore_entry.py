@@ -19,6 +19,10 @@ import os
 # import time and would otherwise try to load the nonexistent "conductor" profile.
 os.environ["CONDUCTOR_AWS_PROFILE"] = ""
 
+# The runtime container is root-owned and runs as a non-root user, so /app is not
+# writable. Point the dispatch workspace at a writable path.
+os.environ.setdefault("CONDUCTOR_WORK_DIR", "/tmp/conductor-work")
+
 from bedrock_agentcore.runtime import BedrockAgentCoreApp  # noqa: E402
 
 from .config import CONFIG  # noqa: E402

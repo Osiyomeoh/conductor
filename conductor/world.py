@@ -19,7 +19,11 @@ from .cost import CostLedger
 from .verification import VerificationRunner
 from .workers import SilentWorker, SimulatedWorker
 
-WORKDIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), ".work")
+# The dispatch workspace. Defaults to a .work dir beside the package, but honours
+# CONDUCTOR_WORK_DIR so a read-only deployment (e.g. AgentCore Runtime, where /app
+# is root-owned and the process is non-root) can point it at a writable path.
+WORKDIR = os.environ.get("CONDUCTOR_WORK_DIR") or os.path.join(
+    os.path.dirname(os.path.dirname(__file__)), ".work")
 
 
 def _cm(title, token, kind, **kw) -> Commitment:
