@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import "./landing.css";
-import { Glyph } from "./logo";
+import { MarketingNav, MarketingFooter } from "./chrome";
 
 type Row = { chip: string; label: string; title: string; why: string; right: string };
 const SCRIPT: Row[] = [
@@ -70,32 +70,7 @@ export function Landing({ go }: { go: (path: string) => void }) {
   const { rowsRef, title, figs } = useStage();
   return (
     <div className="landing">
-      <nav className="nav"><div className="wrap"><div className="row">
-        <div className="brand"><span className="mark"><span className="glyph"><Glyph /></span></span> Conductor</div>
-        <div className="navmenu">
-          <div className="item">
-            <button>Product <svg className="caret" viewBox="0 0 12 12"><path d="M3 5l3 3 3-3" stroke="currentColor" strokeWidth="1.4" fill="none" /></svg></button>
-            <div className="dropdown">
-              {[["✓", "Verification", "Every claim meets its check before it is believed"],
-                ["⑂", "Speculation", "Build every plausible answer while a decision waits"],
-                ["◷", "Attention budget", "Dispatch only what a reviewer can absorb"],
-                ["◐", "The roster", "Hire agents that earn trust like teammates"]].map(([ic, t, d]) => (
-                <div className="di" key={t} onClick={() => go("/app")}>
-                  <span className="ic">{ic}</span><div><div className="dt">{t}</div><div className="dd">{d}</div></div>
-                </div>
-              ))}
-            </div>
-          </div>
-          <div className="item"><button onClick={() => go("/app")}>Customers</button></div>
-          <div className="item"><button onClick={() => go("/signup")}>Pricing</button></div>
-          <div className="item"><button onClick={() => go("/app")}>Now</button></div>
-          <div className="item"><button onClick={() => go("/signup")}>Contact</button></div>
-        </div>
-        <div className="links">
-          <button className="btn ghost" onClick={() => go("/signup")}>Sign in</button>
-          <button className="btn primary" onClick={() => go("/signup")}>Get started</button>
-        </div>
-      </div></div></nav>
+      <MarketingNav go={go} />
 
       <header className="hero"><div className="glow" /><div className="wrap">
         <h1>From one conversation to a team that runs itself.</h1>
@@ -207,32 +182,7 @@ export function Landing({ go }: { go: (path: string) => void }) {
         </div>
       </div></section>
 
-      <footer className="foot-menu"><div className="wrap">
-        <div className="cols">
-          <div className="brandcol">
-            <div className="b"><span className="mark"><span className="glyph"><Glyph /></span></span> Conductor</div>
-            <p>The project manager for humans and agents. Verify every claim, budget your attention.</p>
-          </div>
-          <div className="col"><h5>Product</h5>
-            <a onClick={() => go("/app")}>Verification</a><a onClick={() => go("/app")}>Speculation</a>
-            <a onClick={() => go("/app")}>Attention budget</a><a onClick={() => go("/app")}>The roster</a></div>
-          <div className="col"><h5>Company</h5>
-            <a onClick={() => go("/app")}>Customers</a><a onClick={() => go("/signup")}>Pricing</a>
-            <a onClick={() => go("/app")}>Now</a><a onClick={() => go("/signup")}>Contact</a></div>
-          <div className="col"><h5>Resources</h5>
-            <a onClick={() => go("/app")}>Live demo</a>
-            <a href="https://strandsagents.com" target="_blank" rel="noreferrer">Strands Agents</a>
-            <a href="https://github.com/Osiyomeoh/conductor" target="_blank" rel="noreferrer">GitHub</a>
-            <a onClick={() => go("/signup")}>Documentation</a></div>
-          <div className="col"><h5>Connect</h5>
-            <a href="https://github.com/Osiyomeoh/conductor" target="_blank" rel="noreferrer">GitHub</a>
-            <a onClick={() => go("/signup")}>Contact us</a><a onClick={() => go("/app")}>Community</a></div>
-        </div>
-        <div className="foot-bottom">
-          <span>© 2026 Conductor</span>
-          <span className="mono">Built on Strands Agents · Amazon Bedrock</span>
-        </div>
-      </div></footer>
+      <MarketingFooter go={go} />
     </div>
   );
 }
