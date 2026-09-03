@@ -14,6 +14,7 @@ from .models import Commitment, Evidence, EvidenceKind, Resource, ResourceType
 from .policy import PolicyEngine
 from .speculation import SpeculationEngine
 from .trust import TrustLedger
+from .cost import CostLedger
 from .verification import VerificationRunner
 from .workers import SilentWorker, SimulatedWorker
 
@@ -68,18 +69,19 @@ def build(seed: int = 7) -> Conductor:
         g.add(c)
 
     trust = TrustLedger()
+    cost = CostLedger()
     policy = PolicyEngine(autonomy=0.6)
     verifier = VerificationRunner(workdir=WORKDIR)
     disp = Dispatcher(graph=g, policy=policy, trust=trust)
     disp.budgets["human_sam"] = AttentionBudget("human_sam", minutes_per_day=150)
     disp.workers = {
         # Competent on research, unreliable on code: the confident-and-wrong case.
-        "agent_impl": SimulatedWorker("agent_impl", WORKDIR, competence=0.45, seed=seed),
-        "agent_research": SimulatedWorker("agent_research", WORKDIR, competence=0.9, seed=seed),
+        "agent_impl": SimulatedWorker("agent_impl", WORKDIR, competence=0.45, seed=seed, ledger=cost),
+        "agent_research": SimulatedWorker("agent_research", WORKDIR, competence=0.9, seed=seed, ledger=cost),
         "human_sarah": SilentWorker("human_sarah", WORKDIR, seed=seed),
     }
 
     surface = DecisionSurface(graph=g)
-    spec = SpeculationEngine(graph=g)
+    spec = SpeculationEngine(graph=g, ledger=cost)
     return Conductor(graph=g, verifier=verifier, dispatcher=disp, surface=surface,
-                     speculation=spec, trust=trust)
+                     speculation=spec, trust=trust, cost=cost)

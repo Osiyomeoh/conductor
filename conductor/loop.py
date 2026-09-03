@@ -18,6 +18,7 @@ from .decisions import DecisionSurface
 from .dispatcher import Dispatcher
 from .models import Status, now
 from .speculation import SpeculationEngine
+from .cost import CostLedger
 from .trust import TrustLedger
 from .verification import VerificationRunner
 
@@ -32,6 +33,8 @@ class Metrics:
     questions_asked: int = 0
     interruptions: int = 0
     speculative_cost: float = 0.0
+    cost_verified: float = 0.0
+    cost_rejected: float = 0.0
     held: int = 0
 
 
@@ -43,6 +46,7 @@ class Conductor:
     surface: DecisionSurface
     speculation: SpeculationEngine
     trust: TrustLedger
+    cost: CostLedger = field(default_factory=CostLedger)
     events: list[str] = field(default_factory=list)
     metrics: Metrics = field(default_factory=Metrics)
     silence_hours: float = 4.0
@@ -81,6 +85,7 @@ class Conductor:
             budget = self.dispatcher.budget_for(cm.reviewer or "")
             # A rejected claim costs the human nothing. That is the point.
             budget.release(cm, consumed=passed)
+            self.cost.settle(cm.id, "verified" if passed else "rejected")
             if passed:
                 self.metrics.verified += 1
                 if cm.branch:
@@ -176,5 +181,11 @@ class Conductor:
             if cm.status is Status.ESCALATED:
                 cm.status = Status.PENDING
                 cm.log(f"unblocked by {d.id} = {choice!r}")
+        for b in dropped:
+            for cid in b.commitments:
+                self.cost.settle(cid, "discarded")
+        spent = self.cost.for_decision(d.id)
+        self.metrics.speculative_cost += spent
         self.emit(f"ANSWER {d.id} = {choice!r}: unblocked {len(d.blocked)}, "
-                  f"kept {1 if keep else 0} branch, discarded {len(dropped)}")
+                  f"kept {1 if keep else 0} branch, discarded {len(dropped)}, "
+                  f"speculation cost ${spent:.4f}")

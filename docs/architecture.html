@@ -1,0 +1,364 @@
+<title>Conductor Control Plane</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@600;700&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<style>
+:root{
+  --ink:#12151c; --paper:#f7f8fa; --surface:#ffffff; --line:#d9dde5;
+  --mid:#5b6478; --faint:#8c93a3;
+  --accent:#4c5fd7; --accent-soft:#eaecfb;
+  --pass:#1f8a70; --fail:#b3452c; --held:#9a6b12;
+  --grid:#e7eaf0;
+}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){
+    --ink:#e6e9f0; --paper:#0d1117; --surface:#141922; --line:#28303d;
+    --mid:#98a1b4; --faint:#6c7689;
+    --accent:#8a97ec; --accent-soft:#1c2340;
+    --pass:#4bbd9c; --fail:#e08163; --held:#d8a949;
+    --grid:#1e2530;
+  }
+}
+:root[data-theme="dark"]{
+  --ink:#e6e9f0; --paper:#0d1117; --surface:#141922; --line:#28303d;
+  --mid:#98a1b4; --faint:#6c7689;
+  --accent:#8a97ec; --accent-soft:#1c2340;
+  --pass:#4bbd9c; --fail:#e08163; --held:#d8a949;
+  --grid:#1e2530;
+}
+*{box-sizing:border-box}
+body{background:var(--paper);color:var(--ink);
+  font:400 16px/1.65 "IBM Plex Sans",system-ui,-apple-system,sans-serif;
+  -webkit-font-smoothing:antialiased;padding:0 24px 96px}
+.wrap{max-width:74ch;margin:0 auto}
+.bleed{max-width:1080px;margin:0 auto}
+header{padding:72px 0 40px;border-bottom:1px solid var(--line);margin-bottom:48px}
+.eyebrow{font:500 12px/1 "IBM Plex Mono",ui-monospace,monospace;
+  letter-spacing:.14em;text-transform:uppercase;color:var(--accent);margin:0 0 18px}
+h1{font:700 clamp(34px,6vw,52px)/1.05 Archivo,system-ui,sans-serif;
+  margin:0 0 20px;letter-spacing:-.02em;text-wrap:balance}
+.lede{font-size:19px;line-height:1.55;color:var(--mid);margin:0;max-width:62ch}
+h2{font:600 25px/1.2 Archivo,system-ui,sans-serif;margin:64px 0 14px;
+  letter-spacing:-.01em;text-wrap:balance}
+h3{font:600 16px/1.3 "IBM Plex Sans",sans-serif;margin:34px 0 8px}
+p{margin:0 0 16px}
+strong{font-weight:600}
+code{font:400 .89em/1 "IBM Plex Mono",ui-monospace,monospace;
+  background:var(--accent-soft);padding:2px 5px;border-radius:3px;color:var(--ink)}
+figure{margin:38px 0;padding:0}
+.figbox{background:var(--surface);border:1px solid var(--line);border-radius:8px;
+  padding:26px 22px;overflow-x:auto}
+svg{display:block;width:100%;height:auto;min-width:520px;color:var(--ink)}
+figcaption{font-size:14px;line-height:1.5;color:var(--mid);margin-top:12px;
+  padding-left:2px;max-width:70ch}
+.mono{font:500 11px/1 "IBM Plex Mono",ui-monospace,monospace;letter-spacing:.02em}
+table{width:100%;border-collapse:collapse;margin:26px 0;font-size:15px}
+th{font:500 11px/1 "IBM Plex Mono",monospace;letter-spacing:.1em;text-transform:uppercase;
+  color:var(--faint);text-align:left;padding:0 14px 10px 0;border-bottom:1px solid var(--line)}
+td{padding:12px 14px 12px 0;border-bottom:1px solid var(--grid);vertical-align:top}
+td:first-child{font-weight:600;white-space:nowrap}
+.rule{height:1px;background:var(--line);margin:56px 0;border:0}
+.note{border-left:2px solid var(--accent);padding:2px 0 2px 18px;color:var(--mid);
+  margin:26px 0;font-size:15px}
+</style>
+
+<header class="wrap">
+  <p class="eyebrow">Architecture</p>
+  <h1>Conductor</h1>
+  <p class="lede">A project manager for teams of humans and agents. Every tool ever
+  built assumes labour is expensive and judgment is free. Agents inverted that.
+  Conductor spends cheap labour to buy back scarce judgment.</p>
+</header>
+
+<main class="wrap">
+
+<p>Three premises follow from the inversion, and every component below serves
+one of them.</p>
+
+<p><strong>Done is a claim, not a fact.</strong> An agent reports completion
+confidently and wrongly, all day, at scale. Every tracker on the market records
+that as success. Conductor requires each commitment to carry, from the moment it
+is planned, the evidence that would prove it.</p>
+
+<p><strong>Human attention is the scarce resource.</strong> Dispatching twelve
+agent tasks nobody can review by Friday is not throughput, it is debt with a
+friendly status colour. Work is dispatched only when a reviewer can absorb it.</p>
+
+<p><strong>Waiting is optional.</strong> When a project stalls on a decision only
+a person can make, the plan forks across every plausible answer and builds all of
+them overnight. You pay three times almost nothing to buy back a night.</p>
+
+<hr class="rule">
+
+<h2>Where judgment ends and consequence begins</h2>
+
+<p>One line decides the home of every component. Language models do judgment.
+Deterministic code does consequence. Planning, diagnosis and phrasing a question
+are ambiguous, so they are Strands agents. Whether something is done, whether an
+action may reach the world, whose attention is spent, and what a worker has
+earned are consequential, so they are code with verdicts the model cannot
+override.</p>
+</main>
+
+<div class="bleed">
+<figure>
+<div class="figbox">
+<svg viewBox="0 0 900 340" role="img" aria-label="Agents may propose but only deterministic components may decide; the path from agent to done is blocked, and only the verification runner can mark work complete.">
+  <defs>
+    <marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0 0 L10 5 L0 10 z" fill="currentColor"/>
+    </marker>
+    <marker id="ag" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0 0 L10 5 L0 10 z" fill="var(--pass)"/>
+    </marker>
+  </defs>
+
+  <text x="20" y="24" class="mono" fill="var(--accent)">JUDGMENT · STRANDS AGENTS</text>
+  <rect x="20" y="36" width="380" height="150" rx="6" fill="none" stroke="var(--accent)" stroke-dasharray="4 4" opacity=".7"/>
+  <g fill="var(--surface)" stroke="currentColor" stroke-width="1">
+    <rect x="40" y="56" width="160" height="38" rx="4"/>
+    <rect x="220" y="56" width="160" height="38" rx="4"/>
+    <rect x="40" y="112" width="160" height="38" rx="4"/>
+    <rect x="220" y="112" width="160" height="38" rx="4"/>
+  </g>
+  <g font-size="12" text-anchor="middle" fill="currentColor">
+    <text x="120" y="80">Planner</text>
+    <text x="300" y="80">Recovery</text>
+    <text x="120" y="136">Compressor</text>
+    <text x="300" y="136">Orchestrator</text>
+  </g>
+
+  <text x="500" y="24" class="mono" fill="currentColor">CONSEQUENCE · DETERMINISTIC</text>
+  <rect x="500" y="36" width="380" height="150" rx="6" fill="none" stroke="currentColor" opacity=".45"/>
+  <g fill="var(--surface)" stroke="currentColor" stroke-width="1">
+    <rect x="520" y="56" width="160" height="38" rx="4"/>
+    <rect x="700" y="56" width="160" height="38" rx="4"/>
+    <rect x="520" y="112" width="160" height="38" rx="4"/>
+    <rect x="700" y="112" width="160" height="38" rx="4"/>
+  </g>
+  <g font-size="12" text-anchor="middle" fill="currentColor">
+    <text x="600" y="80">Verification</text>
+    <text x="780" y="80">Policy gate</text>
+    <text x="600" y="136">Attention ledger</text>
+    <text x="780" y="136">Trust ledger</text>
+  </g>
+
+  <line x1="400" y1="111" x2="498" y2="111" stroke="currentColor" marker-end="url(#a)"/>
+  <text x="449" y="103" class="mono" font-size="10" text-anchor="middle" fill="var(--mid)">proposals</text>
+
+  <rect x="20" y="236" width="380" height="46" rx="4" fill="none" stroke="currentColor" opacity=".3"/>
+  <text x="210" y="264" font-size="12" text-anchor="middle" fill="var(--mid)">an agent asserting “it is done”</text>
+  <line x1="400" y1="259" x2="498" y2="259" stroke="var(--fail)" stroke-width="1.5" opacity=".55"/>
+  <line x1="437" y1="243" x2="461" y2="275" stroke="var(--fail)" stroke-width="2"/>
+  <line x1="461" y1="243" x2="437" y2="275" stroke="var(--fail)" stroke-width="2"/>
+  <rect x="500" y="236" width="200" height="46" rx="4" fill="var(--surface)" stroke="var(--pass)"/>
+  <text x="600" y="264" font-size="12" text-anchor="middle" fill="currentColor">Verification runner</text>
+  <line x1="700" y1="259" x2="800" y2="259" stroke="var(--pass)" stroke-width="1.5" marker-end="url(#ag)"/>
+  <text x="850" y="264" font-size="12" text-anchor="middle" fill="var(--pass)">done</text>
+  <text x="750" y="251" class="mono" font-size="10" text-anchor="middle" fill="var(--mid)">only path</text>
+</svg>
+</div>
+<figcaption>The orchestrator can read the board, the queue, attention and trust,
+and it can advance the loop. It has no tool for marking work complete. The only
+edge into <span class="mono">done</span> runs through the verification runner,
+and its verdict is not overridable.</figcaption>
+</figure>
+</div>
+
+<main class="wrap">
+<h2>The life of a claim</h2>
+<p>This is the mechanism the whole product turns on. A worker finishing is not an
+event that changes state. It is a claim entering a check.</p>
+</main>
+
+<div class="bleed">
+<figure>
+<div class="figbox">
+<svg viewBox="0 0 900 300" role="img" aria-label="A completion claim enters verification; passing merges the branch and credits trust, failing returns it to recovery for re-dispatch, and a third failure escalates to a human.">
+  <defs>
+    <marker id="b" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0 0 L10 5 L0 10 z" fill="currentColor"/>
+    </marker>
+  </defs>
+  <g fill="var(--surface)" stroke="currentColor" stroke-width="1">
+    <rect x="20" y="112" width="130" height="44" rx="4"/>
+    <rect x="210" y="112" width="130" height="44" rx="4"/>
+  </g>
+  <g font-size="12" text-anchor="middle" fill="currentColor">
+    <text x="85" y="133">worker</text><text x="85" y="148" fill="var(--mid)" font-size="11">claims done</text>
+    <text x="275" y="139">verify</text>
+  </g>
+  <line x1="150" y1="134" x2="208" y2="134" stroke="currentColor" marker-end="url(#b)"/>
+
+  <path d="M340 124 L420 60" stroke="var(--pass)" stroke-width="1.5" fill="none" marker-end="url(#b)" color="var(--pass)"/>
+  <path d="M340 144 L420 208" stroke="var(--fail)" stroke-width="1.5" fill="none" marker-end="url(#b)" color="var(--fail)"/>
+  <text x="368" y="86" class="mono" font-size="10" fill="var(--pass)">pass</text>
+  <text x="368" y="188" class="mono" font-size="10" fill="var(--fail)">fail</text>
+
+  <rect x="424" y="38" width="150" height="44" rx="4" fill="var(--surface)" stroke="var(--pass)"/>
+  <text x="499" y="59" font-size="12" text-anchor="middle" fill="currentColor">merge branch</text>
+  <text x="499" y="74" font-size="11" text-anchor="middle" fill="var(--mid)">credit trust</text>
+
+  <rect x="424" y="186" width="150" height="44" rx="4" fill="var(--surface)" stroke="var(--fail)"/>
+  <text x="499" y="207" font-size="12" text-anchor="middle" fill="currentColor">recovery</text>
+  <text x="499" y="222" font-size="11" text-anchor="middle" fill="var(--mid)">diagnose cause</text>
+
+  <path d="M499 186 L499 168 L85 168 L85 158" stroke="var(--fail)" stroke-width="1.2" fill="none" marker-end="url(#b)" color="var(--fail)" opacity=".8"/>
+  <text x="292" y="163" class="mono" font-size="10" text-anchor="middle" fill="var(--mid)">re-dispatch with the failure as context</text>
+
+  <line x1="574" y1="208" x2="676" y2="208" stroke="currentColor" marker-end="url(#b)"/>
+  <text x="625" y="200" class="mono" font-size="10" text-anchor="middle" fill="var(--mid)">3rd fail</text>
+  <rect x="680" y="186" width="150" height="44" rx="4" fill="var(--surface)" stroke="var(--held)"/>
+  <text x="755" y="213" font-size="12" text-anchor="middle" fill="currentColor">escalate</text>
+
+  <rect x="20" y="252" width="810" height="34" rx="4" fill="none" stroke="currentColor" opacity=".25"/>
+  <text x="425" y="274" font-size="12" text-anchor="middle" fill="var(--mid)">the human sees nothing above this line</text>
+</svg>
+</div>
+<figcaption>Rejected work costs the reviewer nothing: the branch is discarded and
+re-dispatched with the diagnosis attached. A person is involved only after the
+third failure, and then as a decision rather than a notification.</figcaption>
+</figure>
+</div>
+
+<main class="wrap">
+<h2>Speculation across an open decision</h2>
+<p>The largest source of delay in any project is the stretch labelled “waiting on
+stakeholder”, and no tool measures it. Agent labour is now cheap and parallel, so
+the wait is optional.</p>
+</main>
+
+<div class="bleed">
+<figure>
+<div class="figbox">
+<svg viewBox="0 0 900 300" role="img" aria-label="While a decision waits for a human, the plan forks into three branches that are each built and verified; when the human answers, the matching branch is already verified and merges while the others are discarded.">
+  <defs>
+    <marker id="c" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0 0 L10 5 L0 10 z" fill="currentColor"/>
+    </marker>
+  </defs>
+  <line x1="20" y1="270" x2="880" y2="270" stroke="currentColor" opacity=".3"/>
+  <text x="20" y="288" class="mono" font-size="10" fill="var(--faint)">18:40 decision raised</text>
+  <text x="640" y="288" class="mono" font-size="10" fill="var(--faint)">09:00 human answers</text>
+
+  <rect x="20" y="120" width="120" height="44" rx="4" fill="var(--surface)" stroke="var(--held)"/>
+  <text x="80" y="141" font-size="12" text-anchor="middle" fill="currentColor">decision</text>
+  <text x="80" y="156" font-size="11" text-anchor="middle" fill="var(--mid)">3 options</text>
+
+  <path d="M140 132 L230 46" stroke="currentColor" fill="none" marker-end="url(#c)" opacity=".8"/>
+  <path d="M140 142 L230 142" stroke="currentColor" fill="none" marker-end="url(#c)" opacity=".8"/>
+  <path d="M140 152 L230 218" stroke="currentColor" fill="none" marker-end="url(#c)" opacity=".8"/>
+
+  <g fill="var(--surface)" stroke="currentColor">
+    <rect x="234" y="24" width="330" height="44" rx="4"/>
+    <rect x="234" y="120" width="330" height="44" rx="4"/>
+    <rect x="234" y="196" width="330" height="44" rx="4"/>
+  </g>
+  <g font-size="12" fill="currentColor">
+    <text x="250" y="51">branch A · built and verified</text>
+    <text x="250" y="147">branch B · built and verified</text>
+    <text x="250" y="223">branch C · built and verified</text>
+  </g>
+  <text x="399" y="88" class="mono" font-size="10" text-anchor="middle" fill="var(--mid)">isolated · nothing merges while unresolved · $0.03 total</text>
+
+  <line x1="564" y1="46" x2="660" y2="46" stroke="currentColor" opacity=".35" stroke-dasharray="3 3"/>
+  <line x1="564" y1="142" x2="660" y2="142" stroke="var(--pass)" stroke-width="1.5" marker-end="url(#c)" color="var(--pass)"/>
+  <line x1="564" y1="218" x2="660" y2="218" stroke="currentColor" opacity=".35" stroke-dasharray="3 3"/>
+
+  <rect x="664" y="120" width="200" height="44" rx="4" fill="var(--surface)" stroke="var(--pass)"/>
+  <text x="764" y="141" font-size="12" text-anchor="middle" fill="currentColor">merges immediately</text>
+  <text x="764" y="156" font-size="11" text-anchor="middle" fill="var(--mid)">already verified</text>
+  <text x="700" y="42" font-size="11" fill="var(--faint)">discarded</text>
+  <text x="700" y="222" font-size="11" fill="var(--faint)">discarded</text>
+</svg>
+</div>
+<figcaption>The night is spent building all three answers rather than none. When
+the decision resolves, the chosen work is not queued, it is finished. The two
+discarded branches cost cents and touched nothing.</figcaption>
+</figure>
+</div>
+
+<main class="wrap">
+<h2>The attention gate</h2>
+<p>Ready work is not dispatched because a worker is free. It is dispatched
+because a reviewer can absorb the review it will create.</p>
+</main>
+
+<div class="bleed">
+<figure>
+<div class="figbox">
+<svg viewBox="0 0 900 210" role="img" aria-label="Ready work passes an attention check: if the reviewer has capacity it is dispatched, otherwise it is held with the reason, and review depth is priced by the worker's earned trust.">
+  <defs>
+    <marker id="d" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0 0 L10 5 L0 10 z" fill="currentColor"/>
+    </marker>
+  </defs>
+  <rect x="20" y="80" width="120" height="44" rx="4" fill="var(--surface)" stroke="currentColor"/>
+  <text x="80" y="107" font-size="12" text-anchor="middle" fill="currentColor">ready work</text>
+  <line x1="140" y1="102" x2="208" y2="102" stroke="currentColor" marker-end="url(#d)"/>
+
+  <rect x="212" y="68" width="170" height="68" rx="4" fill="var(--surface)" stroke="var(--accent)"/>
+  <text x="297" y="94" font-size="12" text-anchor="middle" fill="currentColor">review cost</text>
+  <text x="297" y="112" font-size="11" text-anchor="middle" fill="var(--mid)">priced by trust</text>
+  <text x="297" y="128" class="mono" font-size="10" text-anchor="middle" fill="var(--faint)">light · standard · deep</text>
+
+  <line x1="382" y1="102" x2="450" y2="102" stroke="currentColor" marker-end="url(#d)"/>
+  <rect x="454" y="68" width="150" height="68" rx="4" fill="var(--surface)" stroke="currentColor"/>
+  <text x="529" y="97" font-size="12" text-anchor="middle" fill="currentColor">budget left?</text>
+  <text x="529" y="115" class="mono" font-size="10" text-anchor="middle" fill="var(--faint)">reviewer, today</text>
+
+  <path d="M604 88 L700 46" stroke="var(--pass)" stroke-width="1.5" fill="none" marker-end="url(#d)" color="var(--pass)"/>
+  <path d="M604 116 L700 160" stroke="var(--held)" stroke-width="1.5" fill="none" marker-end="url(#d)" color="var(--held)"/>
+  <text x="643" y="60" class="mono" font-size="10" fill="var(--pass)">yes</text>
+  <text x="643" y="150" class="mono" font-size="10" fill="var(--held)">no</text>
+
+  <rect x="704" y="24" width="176" height="44" rx="4" fill="var(--surface)" stroke="var(--pass)"/>
+  <text x="792" y="51" font-size="12" text-anchor="middle" fill="currentColor">dispatch, isolated</text>
+  <rect x="704" y="138" width="176" height="44" rx="4" fill="var(--surface)" stroke="var(--held)"/>
+  <text x="792" y="159" font-size="12" text-anchor="middle" fill="currentColor">held</text>
+  <text x="792" y="174" font-size="11" text-anchor="middle" fill="var(--mid)">with the reason</text>
+</svg>
+</div>
+<figcaption>Trust prices the check: a worker with a clean record on this kind of
+work gets a light review, one that has just failed gets a deep one. Held work is
+honest. A full in-progress column is not.</figcaption>
+</figure>
+</div>
+
+<main class="wrap">
+<h2>Components</h2>
+<table>
+<thead><tr><th>Component</th><th>Kind</th><th>What it exists to kill</th></tr></thead>
+<tbody>
+<tr><td>Verification runner</td><td>code</td><td>The confident, plausible, wrong completion that every tracker records as success</td></tr>
+<tr><td>Attention ledger</td><td>code</td><td>Throughput that is actually unreviewed debt</td></tr>
+<tr><td>Policy gate</td><td>code</td><td>Autonomy nobody can leave running unattended</td></tr>
+<tr><td>Trust ledger</td><td>code</td><td>Paying full verification cost forever</td></tr>
+<tr><td>Speculation engine</td><td>code</td><td>Dead time labelled “waiting on stakeholder”</td></tr>
+<tr><td>Planner</td><td>agent</td><td>Tasks with no definition of proof</td></tr>
+<tr><td>Compressor</td><td>agent</td><td>Answering one uncertainty nine times</td></tr>
+<tr><td>Recovery</td><td>agent</td><td>Re-dispatching the same failure blindly</td></tr>
+<tr><td>Orchestrator</td><td>agent</td><td>A control loop nobody can talk to</td></tr>
+</tbody>
+</table>
+
+<h2>The team is hired, not configured</h2>
+<p>An agent teammate is declared as a job description and joins the board beside
+the people. It starts on probation with no trust, so everything it claims is
+deep-verified until it earns its way down, and graduation is on evidence rather
+than time served.</p>
+
+<p>An agent can also belong to a person. It inherits that principal's scopes and
+can never exceed them, and its output is reviewed by them by default. Delegation
+moves the labour, not the accountability.</p>
+
+<p class="note">When work queues on a kind nobody is reliable at, Conductor
+proposes hiring for it as a decision, with a drafted spec attached. Judgment work
+never counts toward that signal: a queue of decisions means the human is the
+bottleneck, and hiring there would automate precisely the wrong thing.</p>
+
+<h2>Runtime</h2>
+<p>Built on the Strands Agents SDK against Amazon Bedrock, deployed to Bedrock
+AgentCore Runtime. The entrypoint uses AgentCore's async task support rather than
+answering and exiting, so the control loop keeps running between invocations and
+the runtime reports itself busy while it works. Conductor is a loop a person
+joins, not a chatbot they open.</p>
+</main>

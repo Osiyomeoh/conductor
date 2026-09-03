@@ -56,6 +56,15 @@ def main():
         line = c.trust.summary_line(rid)
         if "no history" not in line:
             print(f"  {rid:<16} {line}")
+    print(f"\n{B}What it cost{R}")
+    c_ = c.cost
+    b = c_.by_outcome()
+    print(f"  total spent           ${c_.total:.4f}")
+    print(f"  {G}on work that passed   ${b.get('verified',0):.4f}{R}")
+    print(f"  {RED}on claims that failed ${b.get('rejected',0):.4f}{R}  {D}never billed, never reviewed by Sam{R}")
+    print(f"  {D}on discarded branches ${b.get('discarded',0):.4f}{R}  {D}the price of not waiting overnight{R}")
+    print(f"  {B}cost per verified item ${c_.cost_per_verified():.4f}{R}")
+
     print(f"\n{B}Attention{R}")
     for b in c.dispatcher.budgets.values():
         print(f"  {b.summary()}")

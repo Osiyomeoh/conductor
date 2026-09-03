@@ -60,9 +60,14 @@ class SpeculationEngine:
             made.append(b)
         return made
 
+    ledger: object | None = None
+
     def budget_exhausted(self, decision_id: str) -> bool:
-        spent = sum(b.cost for b in self.branches.values() if b.decision_id == decision_id)
-        return spent >= self.max_cost_per_decision
+        """Speculation is an arbitrage, not a licence to burn compute. Past the
+        cap, the loop goes back to waiting like everyone else."""
+        if self.ledger is None:
+            return False
+        return self.ledger.for_decision(decision_id) >= self.max_cost_per_decision
 
     def resolve(self, decision: Decision) -> tuple[Branch | None, list[Branch]]:
         """Human answered. Keep the branch that assumed correctly, discard the rest."""
@@ -85,7 +90,10 @@ class SpeculationEngine:
         bs = [b for b in self.branches.values() if b.decision_id == decision_id]
         if not bs:
             return "no speculation"
-        cost = sum(b.cost for b in bs)
+        cost = self.ledger.for_decision(decision_id) if self.ledger else 0.0
+        for b in bs:
+            b.verified = sum(1 for cid in b.commitments
+                             if self.graph.get(cid).status.value == "done")
         done = sum(b.verified for b in bs if not b.discarded)
         return (f"{len(bs)} branches speculated, ${cost:.2f} spent, "
                 f"{done} commitments already verified against the chosen answer")

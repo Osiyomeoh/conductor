@@ -25,9 +25,13 @@ class Worker(Protocol):
 
 
 class SimulatedWorker:
+    # Rough shape of a real coding dispatch, used only when no model ran.
+    EST_INPUT, EST_OUTPUT = 45_000, 8_000
+
     def __init__(self, resource_id: str, workdir: str, competence: float = 0.7,
-                 seed: int | None = None):
+                 seed: int | None = None, ledger=None):
         self.id = resource_id
+        self.ledger = ledger
         self.workdir = workdir
         self.competence = competence
         self.rng = random.Random(seed)
@@ -53,6 +57,12 @@ class SimulatedWorker:
                 # Plausible. Well formatted. Missing the thing that was asked for.
                 f.write(f"implemented: {cm.title}\nnotes: complete and working\n")
 
+        if self.ledger is not None:
+            jitter = 0.7 + self.rng.random() * 0.6
+            e = self.ledger.record(cm, self.id, "default",
+                                   int(self.EST_INPUT * jitter),
+                                   int(self.EST_OUTPUT * jitter))
+            cm.log(f"spent ${e.usd:.4f}")
         cm.status = Status.CLAIMED_DONE
         cm.last_signal = now()
         cm.log(f"{self.id} reports complete -> {artifact}")
@@ -79,8 +89,10 @@ class StrandsWorker:
     failure this whole system exists to catch.
     """
 
-    def __init__(self, resource, workdir: str, tools: list | None = None):
+    def __init__(self, resource, workdir: str, tools: list | None = None,
+                 ledger=None):
         self.id = resource.id
+        self.ledger = ledger
         self.resource = resource
         self.workdir = workdir
         self.extra_tools = tools or []
@@ -145,7 +157,15 @@ class StrandsWorker:
                  f"The check that will be run afterwards: {cm.evidence.spec}\n"
                  f"{('Previous attempt failed: ' + context) if context else ''}")
         try:
-            self._agent(order)
+            result = self._agent(order)
+            # Real measured usage, not an estimate.
+            if self.ledger is not None:
+                u = getattr(getattr(result, "metrics", None), "accumulated_usage", {}) or {}
+                e = self.ledger.record(
+                    cm, self.id, os.environ.get("CONDUCTOR_MODEL", "default"),
+                    int(u.get("inputTokens", 0)), int(u.get("outputTokens", 0)))
+                cm.log(f"spent ${e.usd:.4f} "
+                       f"({e.input_tokens}in/{e.output_tokens}out)")
             cm.status = Status.CLAIMED_DONE
             cm.log(f"{self.id} reports complete")
         except Exception as e:  # noqa: BLE001
