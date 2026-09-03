@@ -64,6 +64,9 @@ def main():
     print(f"  {RED}on claims that failed ${b.get('rejected',0):.4f}{R}  {D}never billed, never reviewed by Sam{R}")
     print(f"  {D}on discarded branches ${b.get('discarded',0):.4f}{R}  {D}the price of not waiting overnight{R}")
     print(f"  {B}cost per verified item ${c_.cost_per_verified():.4f}{R}")
+    print(f"\n{B}Spend by model{R}  {D}cheap models do the volume, capable ones the judgment{R}")
+    for mid, usd in sorted(c_.by_model().items(), key=lambda x: -x[1]):
+        print(f"  {mid:<46} ${usd:.4f}")
 
     print(f"\n{B}Attention{R}")
     for b in c.dispatcher.budgets.values():

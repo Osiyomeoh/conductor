@@ -46,13 +46,24 @@ def session():
         ) from e
 
 
-def model(temperature: float = 0.2):
-    """Bedrock-backed model, bound to the Conductor profile."""
+def model(role: str = "orchestrator", override: str | None = None,
+          temperature: float | None = None):
+    """Bedrock-backed model for a role, bound to the Conductor profile.
+
+    Cheap models do the volume, capable models do the judgment. Returns the
+    model plus its resolved id, so cost accounting prices what actually ran
+    rather than what the default said.
+    """
     from strands.models import BedrockModel
+
+    from ..models_config import for_role
+    rm = for_role(role, override)
+    temp = rm.temperature if temperature is None else temperature
     try:
-        return BedrockModel(model_id=DEFAULT_MODEL, boto_session=session(),
-                            temperature=temperature)
+        m = BedrockModel(model_id=rm.model_id, boto_session=session(),
+                         temperature=temp)
     except TypeError:
-        return BedrockModel(boto_session=session(),
-                            model_config={"model_id": DEFAULT_MODEL,
-                                          "temperature": temperature})
+        m = BedrockModel(boto_session=session(),
+                         model_config={"model_id": rm.model_id, "temperature": temp})
+    m.conductor_model_id = rm.model_id
+    return m

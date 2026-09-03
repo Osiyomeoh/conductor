@@ -42,7 +42,7 @@ class Compression(BaseModel):
 class CompressorAgent:
     def __init__(self):
         from strands import Agent
-        self.agent = Agent(model=model(0.1), system_prompt=SYSTEM, name="compressor",
+        self.agent = Agent(model=model("compressor"), system_prompt=SYSTEM, name="compressor",
                            description="Collapses many escalations into few root questions")
 
     def compress(self, escalations: list[dict]) -> Compression:

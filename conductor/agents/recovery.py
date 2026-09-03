@@ -42,7 +42,7 @@ class Diagnosis(BaseModel):
 class RecoveryAgent:
     def __init__(self):
         from strands import Agent
-        self.agent = Agent(model=model(0.2), system_prompt=SYSTEM, name="recovery",
+        self.agent = Agent(model=model("recovery"), system_prompt=SYSTEM, name="recovery",
                            description="Diagnoses failed verifications and decides the next move")
 
     def diagnose(self, title: str, evidence_spec: str, detail: str,

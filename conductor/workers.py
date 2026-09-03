@@ -59,7 +59,8 @@ class SimulatedWorker:
 
         if self.ledger is not None:
             jitter = 0.7 + self.rng.random() * 0.6
-            e = self.ledger.record(cm, self.id, "default",
+            from .models_config import for_role
+            e = self.ledger.record(cm, self.id, for_role("worker").model_id,
                                    int(self.EST_INPUT * jitter),
                                    int(self.EST_OUTPUT * jitter))
             cm.log(f"spent ${e.usd:.4f}")
@@ -127,8 +128,10 @@ class StrandsWorker:
         scopes = ", ".join(self.resource.scopes) or "none"
         principal = (f"\nYou act on behalf of {self.resource.principal}. Never take an "
                      f"action they would not sanction." if self.resource.principal else "")
+        m = model("worker", override=spec.model if spec else None)
+        self.model_id = getattr(m, "conductor_model_id", "default")
         return Agent(
-            model=model(0.2),
+            model=m,
             name=self.id,
             description=spec.purpose if spec else "worker",
             system_prompt=(
@@ -162,7 +165,7 @@ class StrandsWorker:
             if self.ledger is not None:
                 u = getattr(getattr(result, "metrics", None), "accumulated_usage", {}) or {}
                 e = self.ledger.record(
-                    cm, self.id, os.environ.get("CONDUCTOR_MODEL", "default"),
+                    cm, self.id, getattr(self, "model_id", "default"),
                     int(u.get("inputTokens", 0)), int(u.get("outputTokens", 0)))
                 cm.log(f"spent ${e.usd:.4f} "
                        f"({e.input_tokens}in/{e.output_tokens}out)")

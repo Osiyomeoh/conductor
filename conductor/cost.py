@@ -18,11 +18,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
-# USD per million tokens. Placeholders until measured against a real bill.
-PRICES: dict[str, tuple[float, float]] = {
-    "global.anthropic.claude-sonnet-4-6": (3.00, 15.00),
-    "default": (3.00, 15.00),
-}
+from .models_config import PRICES  # single source of truth for rates
 
 
 def price(model: str, input_tokens: int, output_tokens: int) -> float:
@@ -75,6 +71,12 @@ class CostLedger:
     @property
     def total(self) -> float:
         return sum(e.usd for e in self.entries)
+
+    def by_model(self) -> dict[str, float]:
+        out: dict[str, float] = {}
+        for e in self.entries:
+            out[e.model] = out.get(e.model, 0.0) + e.usd
+        return out
 
     def by_outcome(self) -> dict[str, float]:
         out: dict[str, float] = {}

@@ -67,7 +67,7 @@ class SprintPlan(BaseModel):
 class PlannerAgent:
     def __init__(self, temperature: float = 0.2):
         from strands import Agent
-        self.agent = Agent(model=model(temperature), system_prompt=SYSTEM,
+        self.agent = Agent(model=model("planner"), system_prompt=SYSTEM,
                            name="planner",
                            description="Turns intent into commitments that carry their own proof")
 

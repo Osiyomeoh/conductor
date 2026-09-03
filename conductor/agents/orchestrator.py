@@ -57,7 +57,7 @@ def build_orchestrator(conductor):
         return f"{'PASS' if passed else 'FAIL'}: {cm.evidence.detail}"
 
     return Agent(
-        model=model(0.2),
+        model=model("orchestrator"),
         name="conductor",
         description="Runs the project: plans, dispatches, verifies, replans, escalates",
         system_prompt=(
