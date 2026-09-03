@@ -113,13 +113,16 @@ def build(repo_path: str, live: bool = False) -> Conductor:
         g.add(cm)
 
     # One genuine judgment call, to show the loop still stops for a human.
-    api = Commitment.new(
+    # Skipped in live mode: speculation would fork many concurrent agent calls
+    # and exhaust a free-tier quota. The deterministic demo keeps it.
+    api = None if live else Commitment.new(
         "Decide the public API surface",
         Evidence(EvidenceKind.HUMAN_REVIEW, description="product judgment"),
         ambiguous=True, work_kind="product", review_cost_minutes=20,
         options=["flat module functions", "a single Client class",
                  "both, class wrapping functions"])
-    g.add(api)
+    if api is not None:
+        g.add(api)
 
     trust, cost = TrustLedger(), CostLedger()
     disp = Dispatcher(graph=g, policy=PolicyEngine(autonomy=0.6), trust=trust)

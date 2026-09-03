@@ -56,7 +56,7 @@ export function App() {
       </main>
 
       {openDecision && <DecisionOverlay id={openDecision} onClose={() => setOpenDecision(null)} onAnswer={(id, c) => void answer(id, c)} />}
-      {planOpen && <PlanOverlay onClose={() => setPlanOpen(false)} onTick={(k) => void tick(k)} />}
+      {planOpen && <PlanOverlay onClose={() => setPlanOpen(false)} onApproved={() => go("home")} />}
     </div>
   );
 }

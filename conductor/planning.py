@@ -58,20 +58,36 @@ def _fixture(intent: str) -> SprintPlan:
     )
 
 
-def propose(intent: str | None = None, live: bool = False) -> dict:
-    intent = intent or DEMO_INTENT
+import os
+
+
+def live_available() -> bool:
+    """Live planning only when a provider is actually reachable. Gemini needs a
+    key; Bedrock is opt-in via CONDUCTOR_LIVE_PLAN=1 so the app does not hang on
+    a throttled default. Otherwise the planner uses the fixture, instantly."""
+    if os.environ.get("CONDUCTOR_PROVIDER", "bedrock") == "gemini":
+        return bool(os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY"))
+    return os.environ.get("CONDUCTOR_LIVE_PLAN") == "1"
+
+
+def plan_commitments(intent: str, live: bool):
+    """Return (real Commitment objects, rejected, source) for an intent."""
     source = "fixture"
+    plan = _fixture(intent)
     if live:
         try:
             from .agents.planner import PlannerAgent
             plan = PlannerAgent().plan(intent)
             source = "planner-agent"
         except Exception:
-            plan = _fixture(intent)
-    else:
-        plan = _fixture(intent)
-
+            plan = _fixture(intent); source = "fixture"
     made, rejected = materialise(plan)
+    return made, rejected, source, plan
+
+
+def propose(intent: str | None = None, live: bool = False) -> dict:
+    intent = intent or DEMO_INTENT
+    made, rejected, source, plan = plan_commitments(intent, live)
     by_title = {c.title: c for c in made}
     order = [pc.title for pc in plan.commitments]
 

@@ -99,6 +99,40 @@ async def api_tick(request: Request, p: Principal = Depends(caller)):
     return registry.write(p.tenant, lambda c: (c.run(ticks=ticks), state(c))[1])
 
 
+@app.post("/api/plan")
+async def api_plan(request: Request, p: Principal = Depends(caller)):
+    """Turn a spoken sprint into a reviewable plan. Uses the live Strands
+    Planner when a provider is configured, and a fixture otherwise, both through
+    the same evidence gate."""
+    from .planning import live_available, propose
+    body = await _json(request)
+    intent = (body.get("intent") or "").strip() or None
+    return propose(intent, live=live_available())
+
+
+@app.post("/api/approve")
+async def api_approve(request: Request, p: Principal = Depends(caller)):
+    """Approve a planned sprint: materialise its commitments into the tenant's
+    running conductor and start the loop. This is the whole arc, from one
+    conversation to a team doing the work."""
+    from .planning import live_available, plan_commitments
+    body = await _json(request)
+    intent = (body.get("intent") or "").strip()
+    if not intent:
+        raise HTTPException(status_code=400, detail="intent required")
+    made, _rejected, source, _plan = plan_commitments(intent, live=live_available())
+
+    def do(c):
+        for cm in made:
+            c.graph.add(cm)
+        c.run(ticks=4)
+        s = state(c)
+        s["approved"] = len(made)
+        s["planned_by"] = source
+        return s
+    return registry.write(p.tenant, do)
+
+
 @app.post("/api/answer")
 async def api_answer(request: Request, p: Principal = Depends(caller)):
     body = await _json(request)

@@ -20,7 +20,8 @@ async function post<T>(path: string, body: unknown): Promise<T> {
 export const api = {
   state: () => get<State>("/api/state"),
   team: () => get<Team>("/api/team"),
-  plan: () => get<Plan>("/api/plan"),
+  plan: (intent?: string) => post<Plan>("/api/plan", { intent: intent ?? "" }),
+  approve: (intent: string) => post<State & { approved: number; planned_by: string }>("/api/approve", { intent }),
   decision: (id: string) => get<DecisionDetail>(`/api/decision?id=${encodeURIComponent(id)}`),
   tick: (ticks: number) => post<State>("/api/tick", { ticks }),
   answer: (decision_id: string, choice: string) =>

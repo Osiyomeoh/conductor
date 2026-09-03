@@ -247,10 +247,16 @@ function Diagram({ n }: { n: number }) {
 }
 
 // --- plan overlay ---
-export function PlanOverlay({ onClose, onTick }: { onClose: () => void; onTick: (n: number) => void }) {
+const DEFAULT_INTENT = "Next sprint I need the onboarding flow redesigned, the payment webhook fixed, and competitive research on three tools. Sarah owns design, agents can handle the research and the webhook tests.";
+
+export function PlanOverlay({ onClose, onApproved }: { onClose: () => void; onApproved: () => void }) {
+  const [intent, setIntent] = useState(DEFAULT_INTENT);
   const [p, setP] = useState<Plan | null>(null);
-  useEffect(() => { void api.plan().then(setP); }, []);
-  if (!p) return null;
+  const [busy, setBusy] = useState(false);
+
+  const generate = async () => { setBusy(true); try { setP(await api.plan(intent)); } finally { setBusy(false); } };
+  const approve = async () => { setBusy(true); try { await api.approve(intent); onApproved(); onClose(); } finally { setBusy(false); } };
+
   const assignee = (c: Plan["commitments"][number]) =>
     c.judgment ? "asked, not assigned" : c.work_kind === "design" ? "Sarah"
       : c.work_kind === "research" ? "research-agent" : c.work_kind === "content" ? "docs-agent" : "impl-agent";
@@ -258,8 +264,21 @@ export function PlanOverlay({ onClose, onTick }: { onClose: () => void; onTick: 
     <div className="overlay" onClick={(e) => e.target === e.currentTarget && onClose()}>
       <div className="sheet">
         <button className="close" onClick={onClose}>✕</button>
+        {!p ? (
+          <div>
+            <div className="d-q" style={{ fontSize: 26, marginBottom: 8, maxWidth: "100%" }}>Describe your sprint.</div>
+            <div className="note" style={{ marginBottom: 18, fontSize: 13 }}>Say it in plain words. The planner turns it into commitments, each carrying the check that will prove it.</div>
+            <textarea className="intent-box" rows={5} value={intent} onChange={(e) => setIntent(e.target.value)} autoFocus />
+            <div className="plan-foot">
+              <span className="note">One conversation becomes a working team of people and agents.</span>
+              <button className="b primary" onClick={generate} disabled={busy || !intent.trim()}>{busy ? "Planning…" : "Plan the sprint →"}</button>
+            </div>
+          </div>
+        ) : (
+        <>
         <div className="intent">{p.intent}</div>
-        <div className="src">planned by {p.source} · {p.commitments.length} commitments · {p.rejected.length} refused</div>
+        <div className="src">planned by {p.source === "planner-agent" ? "the Strands planner" : "fixture"} · {p.commitments.length} commitments · {p.rejected.length} refused &nbsp;
+          <button className="linky" onClick={() => setP(null)}>edit</button></div>
         <div className="plan-list">{p.commitments.map((c) => (
           <div className="prow" key={c.title}>
             <div><span className="pt">{c.title}</span>{c.judgment && <span className="dtag">Decision</span>}
@@ -278,8 +297,10 @@ export function PlanOverlay({ onClose, onTick }: { onClose: () => void; onTick: 
         </>}
         <div className="plan-foot">
           <span className="note">Every commitment carries the check that will prove it. Nothing reaches done on a worker's word.</span>
-          <button className="b primary" onClick={() => { onClose(); onTick(3); }}>Approve {p.commitments.length} commitments</button>
+          <button className="b primary" onClick={approve} disabled={busy}>{busy ? "Approving…" : `Approve ${p.commitments.length} commitments`}</button>
         </div>
+        </>
+        )}
       </div>
     </div>
   );
