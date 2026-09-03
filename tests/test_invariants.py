@@ -1,0 +1,247 @@
+"""The invariants.
+
+These are not coverage tests. Each one pins a property that, if it broke,
+would quietly turn Conductor back into the thing it exists to replace: a
+tracker that believes what workers tell it.
+
+Several are regressions for bugs found by running the system, and the comment
+on each says which failure it is guarding against.
+"""
+
+from __future__ import annotations
+
+import os
+import tempfile
+
+import pytest
+
+from conductor.attention import AttentionBudget
+from conductor.cost import CostLedger
+from conductor.decisions import DecisionSurface
+from conductor.graph import CommitmentGraph
+from conductor.models import (Action, Commitment, Decision, Evidence, EvidenceKind,
+                              Resource, ResourceType, Status)
+from conductor.policy import PolicyEngine
+from conductor.roster import AgentSpec, Roster
+from conductor.trust import TrustLedger
+from conductor.verification import VerificationRunner, evidence_quality
+from conductor.world import build
+
+
+@pytest.fixture
+def workdir():
+    with tempfile.TemporaryDirectory() as d:
+        yield d
+
+
+def cm(title="t", kind=EvidenceKind.COMMAND, spec="true", **kw):
+    return Commitment.new(title, Evidence(kind, spec=spec), **kw)
+
+
+# --- done is a claim, not a fact -------------------------------------------
+
+def test_evidence_none_fails_closed(workdir):
+    """A commitment with no proof is a planning defect, not a free pass. If
+    this ever returns True, every unverifiable task silently becomes done."""
+    c = cm(kind=EvidenceKind.NONE, spec="")
+    assert VerificationRunner(workdir).verify(c) is False
+    assert c.status is Status.REJECTED
+
+
+def test_failing_command_rejects(workdir):
+    c = cm(spec="exit 1")
+    assert VerificationRunner(workdir).verify(c) is False
+    assert c.status is Status.REJECTED
+
+
+def test_passing_command_completes(workdir):
+    open(os.path.join(workdir, "a.txt"), "w").write("TOKEN\n")
+    c = cm(spec="grep -q TOKEN a.txt")
+    assert VerificationRunner(workdir).verify(c) is True
+    assert c.status is Status.DONE
+
+
+def test_trivial_evidence_is_refused_at_plan_time():
+    """A check that cannot fail launders a false claim into a green tick."""
+    for spec in ("true", ":", "echo ok"):
+        ok, _ = evidence_quality(Evidence(EvidenceKind.COMMAND, spec=spec))
+        assert ok is False
+    ok, _ = evidence_quality(Evidence(EvidenceKind.COMMAND, spec="pytest -q"))
+    assert ok is True
+
+
+def test_human_review_never_auto_passes(workdir):
+    c = cm(kind=EvidenceKind.HUMAN_REVIEW, spec="")
+    assert VerificationRunner(workdir).verify(c) is not True
+    assert c.status is not Status.DONE
+
+
+# --- attention is the constraint -------------------------------------------
+
+def test_budget_holds_what_it_cannot_absorb():
+    b = AttentionBudget("sam", minutes_per_day=30)
+    c = cm(review_cost_minutes=45)
+    assert b.can_absorb(c) is False
+    b.hold(c)
+    assert c.status is Status.HELD
+    assert "45m" in c.history[-1] or "30m" in c.history[-1]
+
+
+def test_rejected_work_costs_the_reviewer_nothing():
+    """The core promise: a human never pays attention for work that failed."""
+    b = AttentionBudget("sam", minutes_per_day=60)
+    c = cm(review_cost_minutes=20)
+    b.reserve(c)
+    b.release(c, consumed=False)
+    assert b.spent == 0
+    assert b.remaining == 60
+
+
+# --- trust is earned slowly and lost at once -------------------------------
+
+def test_trust_falls_immediately_and_deepens_the_check():
+    t = TrustLedger()
+    for _ in range(10):
+        t.record("w", "code", True)
+    assert t.evidence_depth("w", "code") == "light"
+    t.record("w", "code", False)
+    assert t.evidence_depth("w", "code") != "light"
+
+
+def test_peek_does_not_create_records():
+    """Ranking workers must not write. This bug produced phantom trust rows
+    for people who had never done that kind of work."""
+    t = TrustLedger()
+    t.peek("someone", "code")
+    assert t.records == {}
+
+
+# --- the gate ---------------------------------------------------------------
+
+@pytest.mark.parametrize("flag", ["touches_production", "touches_money",
+                                  "speaks_to_customer"])
+def test_hard_blocks_survive_full_autonomy(flag):
+    """No autonomy setting may unlock these. If one ever does, the system is
+    no longer safe to leave running."""
+    p = PolicyEngine(autonomy=1.0)
+    v = p.evaluate(Action(kind="dispatch", commitment_id=None, summary="x",
+                          payload={flag: True}))
+    assert v.decision is Decision.BLOCK
+
+
+# --- the roster -------------------------------------------------------------
+
+def _graph_with_human():
+    g = CommitmentGraph()
+    g.add_resource(Resource("human_sam", ResourceType.HUMAN, "Sam",
+                            scopes=["repo:read", "repo:write:branch"]))
+    return g
+
+
+def test_delegate_cannot_exceed_its_principal():
+    g = _graph_with_human()
+    r = Roster(graph=g, trust=TrustLedger())
+    a = r.hire("a1", "delegate", AgentSpec(purpose="p", work_kinds=["code"],
+                                           scopes=["repo:read", "prod:deploy"]),
+               principal="human_sam")
+    assert "prod:deploy" not in a.scopes
+
+
+def test_delegated_work_is_reviewed_by_the_principal():
+    g = _graph_with_human()
+    r = Roster(graph=g, trust=TrustLedger())
+    r.hire("a1", "delegate", AgentSpec(purpose="p", work_kinds=["code"]),
+           principal="human_sam")
+    assert r.reviewer_for("a1") == "human_sam"
+
+
+def test_new_agents_start_on_probation():
+    g = _graph_with_human()
+    r = Roster(graph=g, trust=TrustLedger())
+    a = r.hire("a1", "x", AgentSpec(purpose="p", work_kinds=["code"]))
+    assert a.probation is True
+    assert r.graduate("a1") is False
+
+
+def test_judgment_work_is_never_a_hiring_signal():
+    """Regression: the roster proposed hiring a 'product agent' to take over
+    the paywall decision. Automating judgment is the exact failure this
+    product exists to prevent."""
+    g = _graph_with_human()
+    for _ in range(5):
+        c = cm(kind=EvidenceKind.HUMAN_REVIEW, spec="", ambiguous=True)
+        c.work_kind = "product"
+        g.add(c)
+    r = Roster(graph=g, trust=TrustLedger())
+    assert r.bottlenecks(min_waiting=1) == []
+
+
+# --- decisions --------------------------------------------------------------
+
+def test_same_uncertainty_compresses_to_one_question():
+    s = DecisionSurface()
+    d1 = s.raise_question("a?", ["x", "y"], "key:1", "cm1")
+    d2 = s.raise_question("b?", ["x", "y"], "key:1", "cm2")
+    assert d1.id == d2.id
+    assert len(s.open) == 1
+    assert set(d1.blocked) == {"cm1", "cm2"}
+
+
+def test_questions_rank_by_what_they_unblock():
+    s = DecisionSurface()
+    s.raise_question("small?", ["x", "y"], "k1", "cm1")
+    s.raise_question("big?", ["x", "y"], "k2", "cm2")
+    s.raise_question("big?", ["x", "y"], "k2", "cm3")
+    assert s.queue()[0].uncertainty_key == "k2"
+
+
+# --- cost -------------------------------------------------------------------
+
+def test_discard_overrides_verified_spend():
+    """Regression: work on a losing branch often passes its check, but nobody
+    will ever use it. Reporting that as verified spend flatters the one number
+    that has to be honest."""
+    led = CostLedger()
+    c = cm()
+    led.record(c, "w", "default", 1000, 1000)
+    led.settle(c.id, "verified")
+    led.settle(c.id, "discarded")
+    assert led.by_outcome().get("verified", 0) == 0
+    assert led.by_outcome()["discarded"] > 0
+
+
+# --- the loop ---------------------------------------------------------------
+
+def test_answering_a_judgment_call_completes_it():
+    """Regression: an answered decision went back to `pending`, was
+    re-escalated on the next tick, and looped forever."""
+    c = build()
+    c.run(ticks=4)
+    q = [d for d in c.surface.queue() if len(d.options) >= 2]
+    assert q, "expected at least one answerable question"
+    d = q[0]
+    target = c.graph.get(d.blocked[0])
+    c.answer(d.id, d.options[0])
+    c.run(ticks=3)
+    assert target.status is Status.DONE
+    assert d.id not in c.surface.open
+
+
+def test_speculation_needs_real_options():
+    """Regression: with no options declared the loop invented 'option A' and
+    then spent real money building it."""
+    c = build()
+    c.run(ticks=4)
+    for d in c.surface.queue():
+        if len(d.options) < 2:
+            assert not [b for b in c.speculation.branches.values()
+                        if b.decision_id == d.id]
+
+
+def test_nothing_reaches_done_without_passing_evidence():
+    """The whole product, as one assertion."""
+    c = build()
+    c.run(ticks=8)
+    for x in c.graph:
+        if x.status is Status.DONE:
+            assert x.evidence.passed is True, f"{x.title} is done without proof"

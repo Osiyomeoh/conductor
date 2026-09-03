@@ -132,6 +132,10 @@ class Conductor:
     def _speculate(self) -> None:
         """Do not wait on the human. Build every plausible answer meanwhile."""
         for d in self.surface.queue():
+            if len(d.options) < 2:
+                # Nothing plausible to fork across. The Compressor proposes real
+                # options when it has enough context; until then, wait honestly.
+                continue
             if any(b.decision_id == d.id for b in self.speculation.branches.values()):
                 continue
             if self.speculation.budget_exhausted(d.id):
@@ -144,8 +148,9 @@ class Conductor:
         """Planner hook: what becomes possible if this answer holds."""
         from .models import Commitment, Evidence, EvidenceKind
         token = f"SPEC_{abs(hash(option)) % 9973}"
+        short = option if len(option) <= 32 else option[:29] + "..."
         cm = Commitment.new(
-            title=f"{blocked_cm.title} (assuming: {option})",
+            title=f"[{short}] follow-on work",
             evidence=Evidence(EvidenceKind.COMMAND,
                               spec=f"grep -q {token} spec_{blocked_cm.id}.txt",
                               description=f"artifact proves the {option} path"),
@@ -160,8 +165,10 @@ class Conductor:
         it models the decision as a task with an assignee and a due date."""
         for cm in self.graph.ready():
             if cm.ambiguous and cm.status is not Status.ESCALATED:
-                opts = cm.options or ["option A", "option B", "option C"]
-                self._escalate(cm, cm.title, opts, key=f"judgment:{cm.id}")
+                # Placeholder options are worse than none: they make an
+                # unanswerable question look answerable, and speculation would
+                # then spend real money building "option A".
+                self._escalate(cm, cm.title, cm.options, key=f"judgment:{cm.id}")
 
     def _dispatch(self) -> None:
         for cm in self.graph.ready():
@@ -178,7 +185,16 @@ class Conductor:
         keep, dropped = self.speculation.resolve(d)
         for cid in d.blocked:
             cm = self.graph.get(cid)
-            if cm.status is Status.ESCALATED:
+            if cm.ambiguous:
+                # The judgment call WAS the work. Answering it completes it;
+                # sending it back to `pending` would only have it re-escalated
+                # on the next tick, forever.
+                cm.status = Status.DONE
+                cm.evidence.passed = True
+                cm.evidence.detail = f"decided: {choice}"
+                cm.notes = choice
+                cm.log(f"decided by {d.id}: {choice!r}")
+            elif cm.status is Status.ESCALATED:
                 cm.status = Status.PENDING
                 cm.log(f"unblocked by {d.id} = {choice!r}")
         for b in dropped:

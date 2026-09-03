@@ -76,6 +76,12 @@ class DecisionSurface:
         return d
 
     @property
+    def open_ended(self) -> list["Decision"]:
+        """Questions we cannot yet offer options for. These are the ones a
+        human must frame, and the ones speculation cannot help with."""
+        return [d for d in self.open.values() if len(d.options) < 2]
+
+    @property
     def compression_ratio(self) -> str:
         raised = sum(len(d.merged_from) + 1 for d in list(self.open.values()) + self.answered)
         asked = len(self.open) + len(self.answered)
