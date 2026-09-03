@@ -14,15 +14,17 @@ from __future__ import annotations
 
 import os
 
-from bedrock_agentcore.runtime import BedrockAgentCoreApp
+# Inside the runtime the task role is the identity, not a named local profile.
+# This MUST run before any conductor import: agents/base.py reads the profile at
+# import time and would otherwise try to load the nonexistent "conductor" profile.
+os.environ["CONDUCTOR_AWS_PROFILE"] = ""
 
-from .config import CONFIG
-from .registry import Registry
-from .server import decision_detail, state
-from .world import persistent
+from bedrock_agentcore.runtime import BedrockAgentCoreApp  # noqa: E402
 
-# Inside the runtime the task role is the identity; use ambient credentials.
-os.environ.setdefault("CONDUCTOR_AWS_PROFILE", "")
+from .config import CONFIG  # noqa: E402
+from .registry import Registry  # noqa: E402
+from .server import decision_detail, state  # noqa: E402
+from .world import persistent  # noqa: E402
 
 app = BedrockAgentCoreApp()
 registry = Registry(build_fn=lambda store, tenant: persistent(store=store, tenant=tenant))

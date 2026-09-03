@@ -3,4 +3,6 @@ strands-agents-tools>=0.1.0
 fastapi
 uvicorn[standard]
 bedrock-agentcore
+boto3
+google-genai
 pydantic
