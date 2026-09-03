@@ -9,6 +9,9 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 COPY conductor ./conductor
+# The built React SPA (web/dist) is served at /app; without it the service
+# falls back to the vanilla pages.
+COPY web/dist ./web/dist
 
 # The control loop runs agents that write files and execute checks. Inside the
 # runtime the task role is the correct identity, so ambient credentials are used.

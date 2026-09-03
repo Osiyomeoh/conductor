@@ -1,0 +1,10 @@
+**/__pycache__/
+.venv/
+web/node_modules/
+web/src/
+.git/
+.work/
+.conductor/
+docs/shots/
+*.jsonl
+.env
