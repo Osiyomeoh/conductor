@@ -15,6 +15,7 @@ import os
 import random
 from typing import Protocol
 
+
 from .models import Commitment, Status, now
 
 
@@ -66,3 +67,90 @@ class SilentWorker(SimulatedWorker):
         cm.status = Status.DISPATCHED
         cm.last_signal = now()
         cm.log(f"dispatched to {self.id}; no response")
+
+
+class StrandsWorker:
+    """A real agent teammate, built from its AgentSpec at dispatch time.
+
+    Note what it is NOT allowed to do: it has no tool for reporting success. It
+    does the work, writes its artifact, and its claim is just a claim. The
+    verification runner decides, afterwards, whether the claim survives. An
+    agent that could mark its own work done would reintroduce exactly the
+    failure this whole system exists to catch.
+    """
+
+    def __init__(self, resource, workdir: str, tools: list | None = None):
+        self.id = resource.id
+        self.resource = resource
+        self.workdir = workdir
+        self.extra_tools = tools or []
+        self._agent = None
+
+    def _build(self):
+        from strands import Agent, tool
+
+        from .agents.base import model
+
+        workdir = self.workdir
+
+        @tool
+        def write_artifact(path: str, content: str) -> str:
+            """Write your output to a file inside the working directory."""
+            full = os.path.join(workdir, path)
+            os.makedirs(os.path.dirname(full) or workdir, exist_ok=True)
+            with open(full, "w") as f:
+                f.write(content)
+            return f"wrote {len(content)} bytes to {path}"
+
+        @tool
+        def read_artifact(path: str) -> str:
+            """Read a file inside the working directory."""
+            full = os.path.join(workdir, path)
+            if not os.path.exists(full):
+                return f"{path} does not exist"
+            with open(full) as f:
+                return f.read()[:8000]
+
+        spec = self.resource.spec
+        scopes = ", ".join(self.resource.scopes) or "none"
+        principal = (f"\nYou act on behalf of {self.resource.principal}. Never take an "
+                     f"action they would not sanction." if self.resource.principal else "")
+        return Agent(
+            model=model(0.2),
+            name=self.id,
+            description=spec.purpose if spec else "worker",
+            system_prompt=(
+                f"{spec.purpose if spec else 'Complete the assigned task.'}\n"
+                f"Permitted scopes: {scopes}.{principal}\n\n"
+                "You will be given one work order and the exact check that will "
+                "be run against your output afterwards. Satisfy the check "
+                "honestly: do the work it describes, not the minimum that would "
+                "make it pass. You cannot mark your own work complete and you "
+                "will not be asked to assess it."
+            ),
+            tools=[write_artifact, read_artifact, *self.extra_tools],
+        )
+
+    def dispatch(self, cm, context: str = "") -> None:
+        if self._agent is None:
+            self._agent = self._build()
+        cm.attempts += 1
+        cm.owner = self.id
+        cm.status = Status.DISPATCHED
+        cm.last_signal = now()
+        cm.log(f"dispatched to {self.id} (attempt {cm.attempts})")
+
+        order = (f"Work order: {cm.title}\n"
+                 f"Write your output to: {cm.artifact_path}\n"
+                 f"The check that will be run afterwards: {cm.evidence.spec}\n"
+                 f"{('Previous attempt failed: ' + context) if context else ''}")
+        try:
+            self._agent(order)
+            cm.status = Status.CLAIMED_DONE
+            cm.log(f"{self.id} reports complete")
+        except Exception as e:  # noqa: BLE001
+            cm.status = Status.REJECTED
+            cm.evidence.passed = False
+            cm.evidence.detail = f"worker error: {type(e).__name__}: {e}"
+            cm.log(f"{self.id} failed to run: {e}")
+        cm.last_signal = now()

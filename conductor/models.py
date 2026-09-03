@@ -89,6 +89,14 @@ class Resource:
     claims_verified: int = 0
     timezone: str = "UTC"
     channel: str = "none"
+    # An agent may act FOR a person. It inherits that principal's scopes, never
+    # exceeds them, and its work is reviewed by that principal by default.
+    principal: str | None = None
+    # What this worker is permitted to touch. The policy engine reads these.
+    scopes: list[str] = field(default_factory=list)
+    # Agents only: how to actually run one.
+    spec: "AgentSpec | None" = None
+    probation: bool = True
 
     @property
     def reliability(self) -> float:
