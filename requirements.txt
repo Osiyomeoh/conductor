@@ -1,2 +1,6 @@
 strands-agents>=0.1.0
 strands-agents-tools>=0.1.0
+fastapi
+uvicorn[standard]
+bedrock-agentcore
+pydantic

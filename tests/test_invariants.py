@@ -587,3 +587,49 @@ def test_server_state_survives_restart(tmp_path):
     # A different tenant on the same store is isolated.
     c3 = persistent(store=JsonlStore(log), tenant="other")
     assert not any(x.id in done1 for x in c3.graph)
+
+
+# --- ASGI service: concurrency, auth, observability -------------------------
+
+def _client():
+    from fastapi.testclient import TestClient
+    import importlib, conductor.asgi as asgi
+    importlib.reload(asgi)
+    return TestClient(asgi.app), asgi
+
+
+def test_asgi_health_and_demo_mode(monkeypatch):
+    monkeypatch.setenv("CONDUCTOR_REQUIRE_AUTH", "0")
+    c, _ = _client()
+    h = c.get("/api/health").json()
+    assert h["status"] == "ok" and h["auth"] == "disabled"
+    assert c.get("/api/state").status_code == 200          # no auth needed
+    r = c.post("/api/tick", json={"ticks": 2})
+    assert r.status_code == 200 and "x-request-id" in r.headers
+
+
+def test_asgi_enforced_auth_and_tenant_isolation(monkeypatch):
+    monkeypatch.setenv("CONDUCTOR_REQUIRE_AUTH", "1")
+    monkeypatch.setenv("CONDUCTOR_SESSION_SECRET", "test-secret")
+    c, asgi = _client()
+    from conductor.auth import mint_session
+
+    assert c.get("/api/state").status_code == 401          # no session
+
+    tok_a, tok_b = mint_session("a", "acme"), mint_session("b", "beta")
+    c.post("/api/tick", json={"ticks": 5}, headers={"Authorization": f"Bearer {tok_a}"})
+    sa = c.get("/api/state", headers={"Authorization": f"Bearer {tok_a}"}).json()
+    sb = c.get("/api/state", headers={"Authorization": f"Bearer {tok_b}"}).json()
+    done_a = sum(1 for x in sa["board"] if x["status"] == "done")
+    done_b = sum(1 for x in sb["board"] if x["status"] == "done")
+    assert done_a > 0 and done_b == 0                       # isolated conductors
+
+
+def test_asgi_rejects_tampered_session(monkeypatch):
+    monkeypatch.setenv("CONDUCTOR_REQUIRE_AUTH", "1")
+    monkeypatch.setenv("CONDUCTOR_SESSION_SECRET", "test-secret")
+    c, _ = _client()
+    from conductor.auth import mint_session
+    tok = mint_session("a", "acme")
+    bad = tok[:-4] + "aaaa"
+    assert c.get("/api/state", headers={"Authorization": f"Bearer {bad}"}).status_code == 401

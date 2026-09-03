@@ -1,18 +1,18 @@
-"""Run Conductor's UI with durable state.
+"""Run Conductor as a production ASGI service.
 
-    python serve.py
+    python serve.py                     # or: uvicorn conductor.asgi:app
 
-State persists through the store the environment selects (CONDUCTOR_TABLE for
-DynamoDB, CONDUCTOR_EVENT_LOG for a local JSONL file, in-memory otherwise). On
-restart the server resumes the work and trust the previous process left.
+Per-tenant isolation, durable state, an auth boundary and request logging come
+from conductor.asgi. Configuration is read from the environment (see
+conductor/config.py): CONDUCTOR_PROVIDER, CONDUCTOR_TABLE / CONDUCTOR_EVENT_LOG,
+CONDUCTOR_REQUIRE_AUTH, CONDUCTOR_HOST / CONDUCTOR_PORT.
 """
+import uvicorn
+
 from conductor.config import CONFIG
 from conductor.logging_setup import setup
-from conductor.server import serve
-from conductor.world import persistent
 
-setup()
-c = persistent(store=CONFIG.store(), tenant=CONFIG.tenant)
-if not c.graph.commitments:
-    c.run(ticks=1)   # nudge a fresh workspace so the board is not empty
-serve(c, port=CONFIG.port)
+if __name__ == "__main__":
+    setup()
+    uvicorn.run("conductor.asgi:app", host=CONFIG.host, port=CONFIG.port,
+                log_level="info")
