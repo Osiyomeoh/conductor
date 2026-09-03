@@ -1,0 +1,49 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: Conductor durable state — DynamoDB event log, partitioned by tenant.
+
+Resources:
+  EventTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: conductor-events
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: tenant
+          AttributeType: S
+        - AttributeName: seq
+          AttributeType: N
+      KeySchema:
+        - AttributeName: tenant       # partition: one tenant's log
+          KeyType: HASH
+        - AttributeName: seq          # sort: append-only sequence
+          KeyType: RANGE
+      PointInTimeRecoverySpecification:
+        PointInTimeRecoveryEnabled: true
+
+  TaskRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: conductor-task-role
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal: { Service: bedrock-agentcore.amazonaws.com }
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: conductor-runtime
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action: [bedrock:InvokeModel, bedrock:InvokeModelWithResponseStream]
+                Resource: "*"
+              - Effect: Allow
+                Action: [dynamodb:PutItem, dynamodb:Query, dynamodb:GetItem]
+                Resource: !GetAtt EventTable.Arn
+
+Outputs:
+  EventTableName:
+    Value: !Ref EventTable
+  TaskRoleArn:
+    Value: !GetAtt TaskRole.Arn

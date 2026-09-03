@@ -130,7 +130,48 @@ commands. Set `CONDUCTOR_AWS_PROFILE=""` to use ambient credentials deliberately
 which is correct inside AgentCore Runtime where the task role is the right
 identity.
 
-### Deploying to AgentCore
+## Deploying to production
+
+Conductor runs as an ASGI service (`conductor.asgi:app`) with per-tenant
+isolation, an auth boundary, durable state and request logging.
+
+```bash
+# local
+python serve.py                        # uvicorn on CONDUCTOR_HOST/PORT
+
+# durable + multi-tenant + enforced auth
+export CONDUCTOR_TABLE=conductor-events        # DynamoDB, or CONDUCTOR_EVENT_LOG=./state.jsonl
+export CONDUCTOR_REQUIRE_AUTH=1
+export CONDUCTOR_SESSION_SECRET=$(openssl rand -hex 32)
+python serve.py
+```
+
+Deployment artifacts are in `deploy/`:
+
+- `cloudformation.yaml` — the DynamoDB event table (partitioned by tenant,
+  sorted by sequence) and the task IAM role. `aws cloudformation deploy`.
+- `Dockerfile` — the ARM64 production image for AgentCore Runtime / Graviton.
+- `agentcore.yaml` — AgentCore CLI configuration.
+
+```bash
+aws cloudformation deploy --template-file deploy/cloudformation.yaml \
+  --stack-name conductor --capabilities CAPABILITY_NAMED_IAM
+npm install -g @aws/agentcore
+agentcore create --name Conductor --framework Strands --model-provider Bedrock
+agentcore deploy
+agentcore invoke '{"action":"state"}'
+```
+
+`conductor/agentcore_entry.py` is the AgentCore Runtime handler; the loop keeps
+running between invocations via `async_task`. `.github/workflows/ci.yml` runs
+the test suite on every push.
+
+**Auth boundary.** `conductor/auth.py` verifies a signed session an identity
+provider establishes; it never handles credentials itself. The self-minted
+HS256 session is for self-hosting; a marked integration point swaps in
+Cognito/Auth0/Okta JWKS validation with no change to the rest of the app.
+
+## Cost
 
 ```bash
 npm install -g @aws/agentcore

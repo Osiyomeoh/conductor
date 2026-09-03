@@ -1,0 +1,22 @@
+# AgentCore Runtime configuration. Deploy with the AgentCore CLI:
+#
+#   npm install -g @aws/agentcore
+#   agentcore create --name Conductor --framework Strands --model-provider Bedrock
+#   agentcore deploy
+#   agentcore invoke '{"action":"state"}'
+#
+# The entrypoint (conductor/agentcore_entry.py) exposes the control loop as an
+# AgentCore Runtime handler; the ASGI app (conductor.asgi) is the always-on
+# service form. Both share the same Conductor and durable store.
+name: Conductor
+framework: Strands
+model_provider: Bedrock
+protocol: HTTP
+build: Container
+memory: none
+environment:
+  CONDUCTOR_PROVIDER: bedrock
+  CONDUCTOR_TABLE: conductor-events         # DynamoDB table (see cloudformation.yaml)
+  CONDUCTOR_REQUIRE_AUTH: "1"
+observability:
+  enabled: true                             # AgentCore Observability / CloudWatch
