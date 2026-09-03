@@ -490,5 +490,20 @@ function toggleTheme(){
 // The head script already set the class before paint; just sync the icon.
 applyTheme(document.documentElement.classList.contains("dk"));
 
-load(); setInterval(load, 4000);
+// Deep links, used for capturing each screen: ?open=plan or ?open=decision.
+async function bootScreen(){
+  await load();
+  const q = new URLSearchParams(location.search);
+  if (q.get("theme")==="dark") applyTheme(true);
+  if (q.get("theme")==="light") applyTheme(false);
+  const open = q.get("open");
+  if (open==="plan") openPlan();
+  else if (open==="decision"){
+    const s = await (await fetch("/api/state")).json();
+    const d = s.decisions.find(d=>d.branches) || s.decisions[0];
+    if (d) openDecision(d.id);
+  }
+}
+bootScreen();
+setInterval(()=>{ if($("overlay").hidden) load(); }, 4000);
 </script>

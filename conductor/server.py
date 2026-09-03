@@ -155,7 +155,9 @@ def serve(conductor, port: int = 7616, open_browser: bool = True):
             elif self.path.startswith("/api/state"):
                 with lock:
                     self._send(200, json.dumps(state(conductor)))
-            elif self.path in ("/", "/index.html"):
+            elif not self.path.startswith("/api"):
+                # Any non-API path (including /?theme=dark&open=plan) serves the
+                # single-page UI; the client reads the query string itself.
                 with open(UI, "rb") as f:
                     self._send(200, f.read(), "text/html; charset=utf-8")
             else:
