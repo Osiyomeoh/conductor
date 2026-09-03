@@ -142,18 +142,7 @@ def shot(name: str):
     raise HTTPException(status_code=404)
 
 
-@app.get("/", response_class=HTMLResponse)
-def landing():
-    return HTMLResponse(open(LANDING).read())
-
-
-@app.get("/signup", response_class=HTMLResponse)
-@app.get("/onboarding", response_class=HTMLResponse)
-def onboarding():
-    return HTMLResponse(open(ONBOARDING).read())
-
-
-@app.get("/app/assets/{asset:path}")
+@app.get("/assets/{asset:path}")
 def react_assets(asset: str):
     """Serve the built React bundle's hashed, content-addressed assets."""
     path = os.path.join(_WEB_DIST, "assets", os.path.basename(asset))
@@ -164,12 +153,18 @@ def react_assets(asset: str):
 
 @app.get("/{path:path}", response_class=HTMLResponse)
 def spa(path: str):
-    if path.startswith("api") or path.startswith("shot"):
+    """The React single-page app owns every HTML route — landing, onboarding
+    and the app — and routes client-side. The hand-rolled vanilla pages remain
+    the fallback only when the frontend has not been built."""
+    if path.startswith("api") or path.startswith("shot") or path.startswith("assets"):
         raise HTTPException(status_code=404)
-    # The React app owns /app; the vanilla page remains the fallback.
-    if _REACT_BUILT and (path == "app" or path.startswith("app")):
+    if _REACT_BUILT:
         return HTMLResponse(open(_REACT_INDEX).read())
-    return HTMLResponse(open(UI).read())
+    if path in ("signup", "onboarding"):
+        return HTMLResponse(open(ONBOARDING).read())
+    if path.startswith("app"):
+        return HTMLResponse(open(UI).read())
+    return HTMLResponse(open(LANDING).read())
 
 
 async def _json(request: Request) -> dict:
