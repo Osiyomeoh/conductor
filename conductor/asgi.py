@@ -807,6 +807,12 @@ async def api_answer(request: Request, p: Principal = Depends(caller)):
         raise HTTPException(status_code=400, detail="decision_id and choice required")
 
     def do(c):
+        # Answering a decision teaches the org who is expert in its domain, so
+        # future questions of that kind route to this person.
+        from .routing import attach, decision_domain
+        d = c.surface.open.get(body["decision_id"])
+        if d is not None:
+            attach(c).record(p.subject, decision_domain(c.graph, d))
         c.answer(body["decision_id"], body["choice"])
         c.run(ticks=4)
         return state(c)

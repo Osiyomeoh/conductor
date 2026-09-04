@@ -60,11 +60,16 @@ def state(c) -> dict:
         # honest framing of a question's weight is the attention it frees.
         review_minutes = sum(g.get(cid).review_cost_minutes for cid in d.blocked
                              if g.get(cid) is not None)
+        from .routing import decision_domain
+        domain = decision_domain(g, d)
+        led = getattr(c, "expertise", None)
+        routed_to = led.best_for(domain) if led is not None else None
         decisions.append({
             "id": d.id, "question": d.root_question, "options": d.options,
             "unblocks": d.unblock_value,
             "commitments": len(d.blocked),
             "review_minutes": review_minutes,
+            "domain": domain, "routed_to": routed_to,
             "compressed_from": len(d.merged_from) + 1,
             "branches": len(spec), "prebuilt": ready,
             "spent": round(c.cost.for_decision(d.id), 4),

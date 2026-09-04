@@ -29,6 +29,8 @@ export interface DecisionSummary {
   unblocks: number;
   commitments: number;
   review_minutes: number;
+  domain: string;
+  routed_to: string | null;
   compressed_from: number;
   branches: number;
   prebuilt: number;
