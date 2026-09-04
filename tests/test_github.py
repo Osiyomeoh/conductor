@@ -174,4 +174,4 @@ def test_github_connect_is_gated(monkeypatch):
 
     c = _api_client(monkeypatch, allow_repo=True, token="ghp_x")
     s = c.get("/api/github").json()
-    assert s["configured"] is True and s["repo"] == "acme/app" and s["connected"] is False
+    assert s["configured"] is True and s["repo_name"] == "acme/app" and s["connected"] is False

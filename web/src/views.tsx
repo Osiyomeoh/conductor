@@ -383,6 +383,121 @@ GEMINI_API_KEY=… python serve.py</pre>
   </>);
 }
 
+export function GitHubView() {
+  const [s, setS] = useState<import("./types").GitHubState | null>(null);
+  const [task, setTask] = useState({ title: "", file: "", check: "" });
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+  useEffect(() => { void api.githubStatus().then(setS).catch(() => {}); }, []);
+
+  const guard = async (fn: () => Promise<import("./types").GitHubState>) => {
+    setBusy(true); setErr(null);
+    try { setS(await fn()); }
+    catch (e) { setErr(e instanceof Error ? e.message : "failed"); }
+    finally { setBusy(false); }
+  };
+  const connect = () => guard(() => api.githubConnect());
+  const addTask = () => guard(async () => { const r = await api.githubTask(task); setTask({ title: "", file: "", check: "" }); return r; });
+  const run = () => guard(() => api.githubRun(6));
+
+  if (!s) return <><Head title="GitHub" sub="loading" /><div className="vbody" /></>;
+
+  if (!s.enabled || !s.configured) return (<>
+    <Head title="GitHub" sub="verified work becomes a draft PR on your repo" />
+    <div className="vbody"><div className="vwrap">
+      <div className="card lockcard">
+        <div className="lockttl">{!s.enabled ? "GitHub execution is off by default" : "No GitHub App configured yet"}</div>
+        <div className="lockbody">
+          {!s.enabled
+            ? <>Running a task's check is real code execution, so it stays behind a flag. Enable it locally, alongside the GitHub App:
+                <pre className="mono lockpre">CONDUCTOR_ALLOW_REPO=1 \
+CONDUCTOR_GITHUB_APP_ID=… CONDUCTOR_GITHUB_INSTALLATION_ID=… \
+CONDUCTOR_GITHUB_PRIVATE_KEY_PATH=…/app.pem \
+CONDUCTOR_GITHUB_REPO=owner/name python serve.py</pre></>
+            : <>Set the GitHub App credentials (App id, installation id, private key path) and the target repo, then reload. Conductor authenticates as its own bot and opens draft PRs, never force-pushing and never merging.</>}
+        </div>
+      </div>
+    </div></div>
+  </>);
+
+  const board = s.board ?? [];
+  const prs = s.prs ?? [];
+  const m = s.metrics;
+  return (<>
+    <Head title="GitHub" sub={s.connected ? (s.repo_name ?? "") : `ready to connect ${s.repo_name ?? ""}`}
+      actions={s.connected
+        ? <button className="b primary" onClick={() => void run()} disabled={busy || board.length === 0}>{busy ? "Running…" : "Run the loop"}</button>
+        : <button className="b primary" onClick={() => void connect()} disabled={busy}>{busy ? "Cloning…" : `Connect ${s.repo_name}`}</button>} />
+    <div className="vbody"><div className="vwrap">
+      {err && <div className="card errcard">{err}</div>}
+      <div className="realnote">
+        Conductor authenticates as a GitHub App, clones <b>{s.repo_name}</b>, and for each task an
+        agent writes code in an isolated worktree. When the check passes, it pushes the branch and
+        opens a <b>draft PR</b> with the check green. It never force-pushes and never merges: you promote and merge.
+      </div>
+
+      {!s.connected ? (
+        <div className="card connectcard">
+          <div className="label">Not connected</div>
+          <div className="realnote" style={{ marginTop: 8 }}>Click Connect to clone {s.repo_name} and start a session.</div>
+        </div>
+      ) : (<>
+        <div className="card taskcard">
+          <div className="label">Add a task</div>
+          <div className="taskgrid">
+            <input className="input" placeholder="Task — e.g. Add slugify(text)" value={task.title}
+              onChange={(e) => setTask({ ...task, title: e.target.value })} />
+            <input className="input mono" placeholder="target file — e.g. slugify.py" value={task.file}
+              onChange={(e) => setTask({ ...task, file: e.target.value })} />
+            <input className="input mono" placeholder="check command — the contract for done" value={task.check}
+              onChange={(e) => setTask({ ...task, check: e.target.value })} />
+            <button className="b" onClick={() => void addTask()}
+              disabled={busy || !task.title.trim() || !task.file.trim() || !task.check.trim()}>Add task</button>
+          </div>
+        </div>
+
+        {m && (
+          <div className="realfigs">
+            <div className="fig fail"><div className="n">{m.claims_rejected}</div><div className="l">caught before PR</div></div>
+            <div className="fig pass"><div className="n">{prs.length}</div><div className="l">draft PRs opened</div></div>
+            <div className="fig ink"><div className="n">{s.in_flight ?? 0}</div><div className="l">in flight</div></div>
+          </div>
+        )}
+
+        {prs.length > 0 && (
+          <div className="section">
+            <div className="label">Draft pull requests</div>
+            <div className="card">
+              {prs.map((p) => (
+                <a className="prrow" key={p.number} href={p.url} target="_blank" rel="noreferrer">
+                  <span className="prnum mono">#{p.number}</span>
+                  <span className="prtitle">{p.title}</span>
+                  <span className="prgo mono">open on GitHub →</span>
+                </a>
+              ))}
+            </div>
+          </div>
+        )}
+
+        <div className="section">
+          <div className="label">Tasks</div>
+          <div className="card">
+            {board.length === 0 && <div className="note" style={{ padding: 16 }}>No tasks yet. Add one above, then Run.</div>}
+            {board.map((x) => (
+              <div className={`row ${x.status === "rejected" ? "fail" : ""}`} key={x.id}>
+                <span className={`chip c-${x.status}`}>{x.status.replace("_", " ")}</span>
+                <div><span className="t">{x.title}</span>
+                  <div className="why mono">{x.evidence.spec}</div></div>
+                <span className="cost">{x.attempts > 0 ? `try ${x.attempts}` : ""}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      </>)}
+    </div></div>
+  </>);
+}
+
 export function TeamView() {
   const [t, setT] = useState<Team | null>(null);
   useEffect(() => { void api.team().then(setT); }, []);

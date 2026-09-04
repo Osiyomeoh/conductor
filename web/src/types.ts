@@ -120,6 +120,15 @@ export interface RepoConnect extends Partial<RealState> {
   live?: boolean;
 }
 
+export interface PullRequest { number: number; url: string; title: string; }
+export interface GitHubState extends Partial<RealState> {
+  enabled: boolean;
+  configured: boolean;
+  connected: boolean;
+  repo_name?: string | null;
+  prs?: PullRequest[];
+}
+
 export interface ActivityEvent {
   seq: number; at: string; kind: string; tone: string; verb: string;
   actor: string | null; title: string | null; detail: string;

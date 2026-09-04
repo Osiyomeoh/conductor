@@ -120,6 +120,7 @@ class GitHubClient:
 # --- executor: verified work becomes a draft PR ---------------------------
 import subprocess  # noqa: E402
 from dataclasses import dataclass as _dataclass  # noqa: E402
+from dataclasses import field as _field  # noqa: E402
 
 from .execution import GitExecutor, _git  # noqa: E402
 
@@ -131,6 +132,7 @@ class GitHubExecutor(GitExecutor):
     that differs is the consequence of a pass: instead of merging locally, push
     the branch and open a draft PR that a human reviews and merges."""
     client: "GitHubClient | None" = None
+    prs: list = _field(default_factory=list)   # {number, url, title} of PRs opened this session
 
     def _push(self, branch: str) -> None:
         # Push over an authenticated URL so the token is never persisted in the
@@ -157,8 +159,11 @@ class GitHubExecutor(GitExecutor):
         # check says so), and a human promotes and merges. Converting draft->ready
         # is a GraphQL-only operation; the human does it when they merge.
         self.close(branch)
-        url = pr.get("html_url") or f"https://github.com/{self.client.repo}/pull/{pr.get('number','')}"
-        return True, f"opened draft PR #{pr.get('number', '?')} {url}"
+        num = pr.get("number")
+        url = pr.get("html_url") or f"https://github.com/{self.client.repo}/pull/{num or ''}"
+        if num and not any(p.get("number") == num for p in self.prs):
+            self.prs.append({"number": num, "url": url, "title": pr.get("title", branch)})
+        return True, f"opened draft PR #{num or '?'} {url}"
 
 
 # --- connect flow ---------------------------------------------------------

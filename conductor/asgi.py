@@ -327,10 +327,13 @@ def _gh_ready():
 def _gh_payload():
     from .server import real_state
     enabled, client = _gh_ready()
+    # repo_name (the owner/name identifier) is distinct from real_state's "repo"
+    # (the file/branch snapshot), which is merged in below.
     out = {"enabled": enabled, "configured": client is not None,
-           "repo": client.repo if client else None, "connected": _gh["c"] is not None}
+           "repo_name": client.repo if client else None, "connected": _gh["c"] is not None}
     if _gh["c"] is not None:
         out.update(real_state(_gh["c"]))
+        out["prs"] = list(getattr(_gh["c"].executor, "prs", []))
     return out
 
 

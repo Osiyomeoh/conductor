@@ -1,4 +1,4 @@
-import type { State, Team, DecisionDetail, Plan, Activity, RealState, RepoConnect } from "./types";
+import type { State, Team, DecisionDetail, Plan, Activity, RealState, RepoConnect, GitHubState } from "./types";
 
 // Thin typed client. Every call returns a typed promise, so a view that reads
 // a field the API does not send fails to compile.
@@ -35,4 +35,8 @@ export const api = {
   repoTask: (t: { title: string; file: string; check: string }) => post<RepoConnect>("/api/repo/task", t),
   repoRun: (ticks: number) => post<RepoConnect>("/api/repo/run", { ticks }),
   repoDisconnect: () => post<RepoConnect>("/api/repo/disconnect", {}),
+  githubStatus: () => get<GitHubState>("/api/github"),
+  githubConnect: () => post<GitHubState>("/api/github/connect", {}),
+  githubTask: (t: { title: string; file: string; check: string }) => post<GitHubState>("/api/github/task", t),
+  githubRun: (ticks: number) => post<GitHubState>("/api/github/run", { ticks }),
 };
