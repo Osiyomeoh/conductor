@@ -112,7 +112,8 @@ def caller(request: Request) -> Principal:
     if not (tenant.startswith("demo_") and len(tenant) <= 40 and tenant[5:].isalnum()):
         tenant = "demo_" + secrets.token_hex(8)
         request.state.set_demo_tenant = tenant
-    return Principal(subject="demo", tenant=tenant)
+    # Admin in the demo, so RBAC-gated routes are not blocked for a demo visitor.
+    return Principal(subject="demo", tenant=tenant, roles=("admin", "member", "approver"))
 
 
 def client_key(request: Request, p: Principal) -> str:
@@ -144,6 +145,26 @@ def health():
         mode = "sso" if oidc_configured() else "session"
     return {"status": "ok", "provider": CONFIG.provider, "auth": mode,
             "active_boards": registry.count()}
+
+
+@app.get("/api/whoami")
+def api_whoami(p: Principal = Depends(caller)):
+    """Who the caller is, for the SPA to render the signed-in user and gate UI
+    by role. In demo mode this is the admin demo principal."""
+    return {"subject": p.subject, "tenant": p.tenant, "email": p.email,
+            "roles": list(p.roles)}
+
+
+@app.get("/api/auth/config")
+def api_auth_config():
+    """What the SPA needs to sign a user in: the mode, and where to send them.
+    login_url is the identity provider's hosted sign-in URL (operator-provided)."""
+    from .auth import oidc_configured
+    import os as _os
+    mode = "disabled"
+    if auth_required():
+        mode = "sso" if oidc_configured() else "session"
+    return {"mode": mode, "login_url": _os.environ.get("CONDUCTOR_OIDC_LOGIN_URL")}
 
 
 @app.get("/api/state")
@@ -269,7 +290,7 @@ def api_repo_status(p: Principal = Depends(caller)):
 
 
 @app.post("/api/repo/connect")
-async def api_repo_connect(request: Request, p: Principal = Depends(caller)):
+async def api_repo_connect(request: Request, p: Principal = Depends(require("admin"))):
     _require_repo_enabled()
     from .userrepo import build_for_repo, validate_repo
     body = await _json(request)
@@ -359,7 +380,7 @@ def api_github_status(p: Principal = Depends(caller)):
 
 
 @app.post("/api/github/connect")
-async def api_github_connect(p: Principal = Depends(caller)):
+async def api_github_connect(p: Principal = Depends(require("admin"))):
     import shutil as _sh
     import tempfile as _tf
     from .github import build_for_github
@@ -437,7 +458,7 @@ async def api_github_webhook(request: Request):
 
 
 @app.post("/api/reset")
-def api_reset(p: Principal = Depends(caller)):
+def api_reset(p: Principal = Depends(require("admin"))):
     """Rebuild this tenant from a fresh seed. The guided demo calls this so a
     cold visitor always starts from the same clean board."""
     return registry.reset(p.tenant, lambda c: state(c))

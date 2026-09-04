@@ -683,6 +683,27 @@ def test_asgi_demo_visitors_are_isolated_and_rate_limited(monkeypatch):
     assert r.status_code == 200
 
 
+def test_asgi_rbac_gates_admin_routes(monkeypatch):
+    """whoami reflects the caller's roles, and admin-only routes reject a
+    non-admin. In demo mode the principal is admin, so nothing is gated."""
+    monkeypatch.setenv("CONDUCTOR_REQUIRE_AUTH", "0")
+    c, _ = _client()
+    who = c.get("/api/whoami").json()
+    assert who["subject"] == "demo" and "admin" in who["roles"]
+    assert c.get("/api/auth/config").json()["mode"] == "disabled"
+
+    monkeypatch.setenv("CONDUCTOR_REQUIRE_AUTH", "1")
+    monkeypatch.setenv("CONDUCTOR_SESSION_SECRET", "test-secret")
+    c, _ = _client()
+    from conductor.auth import mint_session
+    member = {"authorization": "Bearer " + mint_session("u", "acme", roles=("member",))}
+    admin = {"authorization": "Bearer " + mint_session("a", "acme", roles=("admin",))}
+    assert c.get("/api/whoami", headers=member).json()["roles"] == ["member"]
+    assert c.post("/api/reset", headers=member).status_code == 403       # admin-only
+    assert c.post("/api/reset", headers=admin).status_code == 200
+    assert c.get("/api/auth/config").json()["mode"] == "session"
+
+
 def test_asgi_enforced_auth_and_tenant_isolation(monkeypatch):
     monkeypatch.setenv("CONDUCTOR_REQUIRE_AUTH", "1")
     monkeypatch.setenv("CONDUCTOR_SESSION_SECRET", "test-secret")

@@ -74,12 +74,12 @@ def _unb64(s: str) -> bytes:
 
 
 def mint_session(subject: str, tenant: str, email: str | None = None,
-                 ttl_seconds: int = 86400) -> str:
+                 ttl_seconds: int = 86400, roles: tuple[str, ...] = ()) -> str:
     """Issue a signed session. Call this from your login handler AFTER the
     identity provider has authenticated the user — never from raw credentials
     inside this process."""
     payload = {"sub": subject, "tenant": tenant, "email": email,
-               "exp": int(time.time()) + ttl_seconds}
+               "roles": list(roles), "exp": int(time.time()) + ttl_seconds}
     body = _b64(json.dumps(payload, separators=(",", ":")).encode())
     sig = _b64(hmac.new(_secret(), body.encode(), hashlib.sha256).digest())
     return f"{body}.{sig}"

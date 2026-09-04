@@ -1,21 +1,54 @@
 import type { State, Team, DecisionDetail, Plan, Activity, RealState, RepoConnect, GitHubState } from "./types";
 
+const TOKEN_KEY = "conductor_token";
+
+// After the identity provider redirects back with #id_token=..., capture it,
+// persist it, and clean it out of the URL. Otherwise read a stored token.
+function authToken(): string | null {
+  try {
+    const frag = new URLSearchParams(location.hash.replace(/^#/, ""));
+    const t = frag.get("id_token") || frag.get("access_token");
+    if (t) {
+      localStorage.setItem(TOKEN_KEY, t);
+      history.replaceState(null, "", location.pathname + location.search);
+      return t;
+    }
+    return localStorage.getItem(TOKEN_KEY);
+  } catch { return null; }
+}
+
+export function signOut(): void {
+  try { localStorage.removeItem(TOKEN_KEY); } catch { /* ignore */ }
+}
+
+function authHeaders(base: Record<string, string>): Record<string, string> {
+  const t = authToken();
+  return t ? { ...base, authorization: `Bearer ${t}` } : base;
+}
+
 // Thin typed client. Every call returns a typed promise, so a view that reads
 // a field the API does not send fails to compile.
 async function get<T>(path: string): Promise<T> {
-  const r = await fetch(path, { headers: { "accept": "application/json" } });
+  const r = await fetch(path, { headers: authHeaders({ accept: "application/json" }) });
   if (!r.ok) throw new Error(`${path} -> ${r.status}`);
   return r.json() as Promise<T>;
 }
 async function post<T>(path: string, body: unknown): Promise<T> {
   const r = await fetch(path, {
     method: "POST",
-    headers: { "content-type": "application/json" },
+    headers: authHeaders({ "content-type": "application/json" }),
     body: JSON.stringify(body),
   });
   if (!r.ok) throw new Error(`${path} -> ${r.status}`);
   return r.json() as Promise<T>;
 }
+
+export interface WhoAmI { subject: string; tenant: string; email: string | null; roles: string[]; }
+export interface AuthConfig { mode: "disabled" | "session" | "sso"; login_url: string | null; }
+
+// Capture a token from the redirect fragment immediately on load, before the
+// router rewrites the hash.
+authToken();
 
 export const api = {
   state: () => get<State>("/api/state"),
@@ -39,4 +72,6 @@ export const api = {
   githubConnect: () => post<GitHubState>("/api/github/connect", {}),
   githubTask: (t: { title: string; file: string; check: string }) => post<GitHubState>("/api/github/task", t),
   githubRun: (ticks: number) => post<GitHubState>("/api/github/run", { ticks }),
+  whoami: () => get<WhoAmI>("/api/whoami"),
+  authConfig: () => get<AuthConfig>("/api/auth/config"),
 };

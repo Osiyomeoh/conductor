@@ -1,7 +1,23 @@
 import { useEffect, useState } from "react";
+import { api } from "./api";
 import { useConductor, useTheme } from "./hooks";
 import { Glyph } from "./logo";
 import { ActivityView, BoardView, CostView, DecisionsView, DecisionOverlay, GitHubView, HomeView, PlanOverlay, RealView, RepoView, TeamView } from "./views";
+
+function SignIn({ loginUrl }: { loginUrl: string | null }) {
+  return (
+    <div className="signin">
+      <div className="signin-card">
+        <span className="mark"><span className="glyph"><Glyph /></span></span>
+        <div className="signin-t">Sign in to Conductor</div>
+        <div className="signin-d">This workspace requires you to sign in with your organization account.</div>
+        {loginUrl
+          ? <a className="b primary" href={loginUrl}>Continue with SSO</a>
+          : <div className="signin-warn">No sign-in URL is configured. Set CONDUCTOR_OIDC_LOGIN_URL.</div>}
+      </div>
+    </div>
+  );
+}
 
 type ViewName = "home" | "board" | "decisions" | "activity" | "real" | "repo" | "github" | "team" | "cost";
 const NAV: { view: ViewName; icon: string; label: string }[] = [
@@ -24,10 +40,27 @@ export function App() {
   const [dark, toggleTheme] = useTheme();
   const overlayOpen = openDecision !== null || planOpen;
   const { state, tick, answer } = useConductor(overlayOpen);
+  const [gate, setGate] = useState<"checking" | "ok" | "signin">("checking");
+  const [loginUrl, setLoginUrl] = useState<string | null>(null);
 
   useEffect(() => { location.hash = view; }, [view]);
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      try {
+        const cfg = await api.authConfig();
+        if (cfg.mode !== "sso") { if (alive) setGate("ok"); return; }
+        try { await api.whoami(); if (alive) setGate("ok"); }
+        catch { if (alive) { setLoginUrl(cfg.login_url); setGate("signin"); } }
+      } catch { if (alive) setGate("ok"); }   // fail open: never brick the app on a config error
+    })();
+    return () => { alive = false; };
+  }, []);
 
-  if (!state) return <div className="app"><aside className="sidebar" /><main className="content" /></div>;
+  const skeleton = <div className="app"><aside className="sidebar" /><main className="content" /></div>;
+  if (gate === "checking") return skeleton;
+  if (gate === "signin") return <SignIn loginUrl={loginUrl} />;
+  if (!state) return skeleton;
 
   const n = state.decisions.length;
   const go = (v: ViewName) => setView(v);
