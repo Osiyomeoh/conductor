@@ -8,17 +8,23 @@ nothing. This runner decides whether the claim survives contact with reality.
 from __future__ import annotations
 
 import os
-import subprocess
 import urllib.request
 
 from .models import Commitment, Evidence, EvidenceKind, Status, now
 
 
 class VerificationRunner:
-    def __init__(self, workdir: str = ".", timeout: int = 120, dry_run: bool = False):
+    def __init__(self, workdir: str = ".", timeout: int = 120, dry_run: bool = False,
+                 runner=None):
         self.workdir = workdir
         self.timeout = timeout
         self.dry_run = dry_run
+        # Where a command check runs: on the host, in a container, or in the
+        # cloud. Chosen from the environment unless a runner is passed in.
+        if runner is None:
+            from .sandbox import runner_from_env
+            runner = runner_from_env()
+        self.runner = runner
 
     def verify(self, cm: Commitment) -> bool:
         ev = cm.evidence
@@ -51,14 +57,9 @@ class VerificationRunner:
     def _command(self, spec: str) -> tuple[bool, str]:
         if self.dry_run:
             return True, "dry run"
-        try:
-            p = subprocess.run(spec, shell=True, cwd=self.workdir, capture_output=True,
-                               text=True, timeout=self.timeout)
-        except subprocess.TimeoutExpired:
-            return False, f"timed out after {self.timeout}s"
-        if p.returncode == 0:
-            return True, (p.stdout or "").strip()[-400:]
-        return False, f"exit {p.returncode}: {((p.stderr or p.stdout) or '').strip()[-400:]}"
+        # Delegated to the configured sandbox (local / docker / codebuild) so the
+        # arbitrary check never runs in-process on the server by default in prod.
+        return self.runner.run(self.workdir, spec, self.timeout)
 
     def _file(self, spec: str) -> tuple[bool, str]:
         path = os.path.join(self.workdir, spec)

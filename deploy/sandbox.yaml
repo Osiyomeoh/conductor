@@ -1,0 +1,65 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: Conductor check sandbox — a CodeBuild project + S3 source bucket that
+  run each evidence command in a disposable, isolated build. Deploy this, then
+  set CONDUCTOR_SANDBOX=codebuild + the project/bucket names on the service.
+
+Resources:
+  SourceBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub "conductor-checks-${AWS::AccountId}-${AWS::Region}"
+      LifecycleConfiguration:
+        Rules:
+          - Id: expire-check-sources          # check zips are ephemeral
+            Status: Enabled
+            ExpirationInDays: 1
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+
+  BuildRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: conductor-checks-build
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal: { Service: codebuild.amazonaws.com }
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: run-checks
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action: [logs:CreateLogGroup, logs:CreateLogStream, logs:PutLogEvents]
+                Resource: "*"
+              - Effect: Allow
+                Action: [s3:GetObject]
+                Resource: !Sub "${SourceBucket.Arn}/*"
+
+  CheckProject:
+    Type: AWS::CodeBuild::Project
+    Properties:
+      Name: conductor-checks
+      ServiceRole: !GetAtt BuildRole.Arn
+      TimeoutInMinutes: 10
+      Artifacts: { Type: NO_ARTIFACTS }
+      Environment:
+        Type: LINUX_CONTAINER
+        ComputeType: BUILD_GENERAL1_SMALL
+        Image: aws/codebuild/standard:7.0     # carries python, node, common tooling
+      Source:
+        Type: S3
+        Location: !Sub "${SourceBucket}/placeholder"   # overridden per build
+
+Outputs:
+  ProjectName:
+    Value: !Ref CheckProject
+  BucketName:
+    Value: !Ref SourceBucket
+  Note:
+    Value: "Set CONDUCTOR_SANDBOX=codebuild, CONDUCTOR_CODEBUILD_PROJECT and CONDUCTOR_CODEBUILD_BUCKET on the service; grant its instance role codebuild:StartBuild/BatchGetBuilds and s3:PutObject on the bucket."
