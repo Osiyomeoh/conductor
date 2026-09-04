@@ -9,3 +9,7 @@ CLAUDE.md
 .claude/
 web/node_modules/
 web/*.tsbuildinfo
+
+# private keys — never commit
+*.pem
+!**/site-packages/**/*.pem
