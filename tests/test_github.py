@@ -111,16 +111,16 @@ def test_executor_merge_opens_draft_pr_and_marks_ready(tmp_path, monkeypatch):
             .enqueue(200, {"default_branch": "main"})     # default_branch()
             .enqueue(200, [])                              # open_draft_pr: none open
             .enqueue(201, {"number": 12, "draft": True})  # create draft PR
-            .enqueue(201, {})                             # set_check
-            .enqueue(200, {"number": 12, "draft": False}))  # mark_ready
+            .enqueue(201, {}))                            # set_check
     ex = GitHubExecutor(repo=repo, client=client(fake))
     monkeypatch.setattr(ex, "_push", lambda branch: None)   # no network in tests
 
     ok, detail = ex.merge("conductor/cm_1")
     assert ok and "PR #12" in detail
     assert any(c["method"] == "POST" and c["url"].endswith("/pulls") for c in fake.calls)   # opened PR
-    assert any(c["body"] == {"draft": False} for c in fake.calls if c["method"] == "PATCH")  # marked ready
+    assert any(c["body"].get("draft") is True for c in fake.calls if c["method"] == "POST" and c["url"].endswith("/pulls"))  # as a draft
     assert any(c["body"].get("state") == "success" for c in fake.calls if c["method"] == "POST" and "statuses" in c["url"])
+    assert not any(c["method"] == "PATCH" for c in fake.calls)   # never force-promotes; the human does
 
 
 def test_build_for_github_wires_the_pr_executor(tmp_path):

@@ -153,11 +153,12 @@ class GitHubExecutor(GitExecutor):
                                        body="Verified by Conductor. Evidence passed "
                                             "before this was opened for review.")
         self.client.set_check(sha, branch.split("/")[-1], True, "evidence passed")
-        if pr.get("number"):
-            self.client.mark_ready(int(pr["number"]))
+        # Left as a draft on purpose: Conductor's evidence has passed (the green
+        # check says so), and a human promotes and merges. Converting draft->ready
+        # is a GraphQL-only operation; the human does it when they merge.
         self.close(branch)
         url = pr.get("html_url") or f"https://github.com/{self.client.repo}/pull/{pr.get('number','')}"
-        return True, f"opened PR #{pr.get('number', '?')} {url}"
+        return True, f"opened draft PR #{pr.get('number', '?')} {url}"
 
 
 # --- connect flow ---------------------------------------------------------
