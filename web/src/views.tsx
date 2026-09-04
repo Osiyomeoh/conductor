@@ -554,6 +554,7 @@ function MembersPanel() {
 
 export function TeamView() {
   const [t, setT] = useState<Team | null>(null);
+  const [hiring, setHiring] = useState(false);
   useEffect(() => { void api.team().then(setT); }, []);
   if (!t) return <><Head title="Team" sub="loading" /><div className="vbody" /></>;
   return (<>
@@ -564,7 +565,13 @@ export function TeamView() {
         <div key={p.kind} className="card panel" style={{ border: "1px solid var(--held)", background: "var(--held-bg)", marginBottom: 24 }}>
           <div className="label" style={{ color: "var(--held)" }}>Hiring proposal</div>
           <div style={{ fontSize: 16, fontWeight: 600 }}>{p.question}</div>
-          <div className="opts" style={{ marginTop: 14 }}>{p.options.map((o) => <button className="b" key={o}>{o}</button>)}</div>
+          <div className="opts" style={{ marginTop: 14 }}>{p.options.map((o) => (
+            <button className={`b ${o.startsWith("hire") ? "primary" : ""}`} key={o} disabled={hiring}
+              onClick={() => {
+                if (o.startsWith("hire")) { setHiring(true); void api.hire(p.kind).then((nt) => { setT(nt); setHiring(false); }).catch(() => setHiring(false)); }
+                else { setT({ ...t, proposals: t.proposals.filter((x) => x.kind !== p.kind) }); }
+              }}>{o}</button>
+          ))}</div>
         </div>
       ))}
       <div className="card">

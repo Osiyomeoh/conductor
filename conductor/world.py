@@ -111,6 +111,28 @@ def build(seed: int = 7, store=None, tenant: str = "default",
                      recorder=recorder, executor=executor)
 
 
+def hire_agent(c, kind: str, competence: float = 0.8) -> str:
+    """Hire an agent for a kind of work: add it to the roster on probation and
+    give it a worker so it can actually be dispatched. Returns the new agent id."""
+    import uuid
+    from .roster import AgentSpec, Roster
+    from .workers import SimulatedWorker
+    aid = f"agent_{kind}_{uuid.uuid4().hex[:6]}"
+    spec = AgentSpec(
+        purpose=f"Handle {kind} work end to end, producing output whose "
+                f"correctness can be checked mechanically.",
+        work_kinds=[kind], scopes=["repo:read", "repo:write:branch"])
+    Roster(graph=c.graph, trust=c.trust).hire(aid, f"{kind}-agent", spec)
+    c.dispatcher.workers[aid] = SimulatedWorker(
+        aid, WORKDIR, competence=competence,
+        seed=abs(hash(aid)) % 1000, ledger=c.cost)
+    from .events import EventKind
+    if getattr(c, "recorder", None) is not None:
+        c.recorder.record(EventKind.HIRED, actor=aid, work_kind=kind)
+    c.emit(f"hired {aid} for {kind} work, on probation")
+    return aid
+
+
 def persistent(store=None, tenant: str = "default", seed: int = 7,
                repo: str | None = None):
     """Resume from a durable log if one exists for this tenant, otherwise seed

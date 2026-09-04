@@ -226,6 +226,24 @@ def api_activity(p: Principal = Depends(caller)):
     return registry.read(p.tenant, activity)
 
 
+@app.post("/api/team/hire")
+async def api_team_hire(request: Request, p: Principal = Depends(require("admin"))):
+    """Hire an agent for a kind of work. It joins the roster on probation and
+    can immediately be dispatched to. Admin only: adding a teammate is
+    consequential."""
+    from .world import hire_agent
+    body = await _json(request)
+    kind = (body.get("kind") or "").strip()
+    if not kind:
+        raise HTTPException(status_code=400, detail="kind required")
+
+    def do(c):
+        hire_agent(c, kind)
+        c.run(ticks=2)          # let the new hire pick up queued work
+        return team(c)
+    return await run_in_threadpool(lambda: registry.write(p.tenant, do))
+
+
 @app.get("/api/decision")
 def api_decision(id: str, p: Principal = Depends(caller)):
     detail = registry.read(p.tenant, lambda c: decision_detail(c, id))

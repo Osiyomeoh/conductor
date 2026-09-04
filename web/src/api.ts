@@ -80,6 +80,7 @@ export const api = {
   githubRun: (ticks: number) => post<GitHubState>("/api/github/run", { ticks }),
   whoami: () => get<WhoAmI>("/api/whoami"),
   authConfig: () => get<AuthConfig>("/api/auth/config"),
+  hire: (kind: string) => post<Team>("/api/team/hire", { kind }),
   members: () => get<{ members: OrgMember[] }>("/api/members"),
   addMember: (m: { subject: string; role: string; email?: string }) => post<{ members: OrgMember[] }>("/api/members", m),
   removeMember: (subject: string) => del<{ members: OrgMember[] }>(`/api/members/${encodeURIComponent(subject)}`),
