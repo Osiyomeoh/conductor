@@ -30,16 +30,24 @@ echo "==> building + pushing linux/amd64 image  ${IMAGE}"
 docker buildx build --platform linux/amd64 -f deploy/Dockerfile \
   -t "$IMAGE" --push .
 
-# Live agents: if a Gemini key is present (in the env or .env), run the agents
-# live on Gemini. The key flows straight from .env into the service parameter;
-# it is never printed or committed.
+# Secrets flow straight from .env into service parameters (an array, so values
+# with special characters survive); they are never printed or committed.
 [ -f .env ] && set -a && . ./.env && set +a
-PARAMS="ImageUri=${IMAGE}"
+PARAMS=( "ImageUri=${IMAGE}" )
 if [ -n "${GEMINI_API_KEY:-}" ]; then
-  echo "==> Gemini key found: deploying with live agents (provider=gemini, model=${CONDUCTOR_GEMINI_MODEL:-gemini-3.5-flash})"
-  PARAMS="$PARAMS Provider=gemini GeminiApiKey=${GEMINI_API_KEY} GeminiModel=${CONDUCTOR_GEMINI_MODEL:-gemini-3.5-flash}"
-else
-  echo "==> no Gemini key: deploying with the deterministic fixture planner"
+  echo "==> Gemini key found: live agents on ${CONDUCTOR_GEMINI_MODEL:-gemini-3.5-flash}"
+  PARAMS+=( "Provider=gemini" "GeminiApiKey=${GEMINI_API_KEY}" "GeminiModel=${CONDUCTOR_GEMINI_MODEL:-gemini-3.5-flash}" )
+fi
+if [ -n "${CONDUCTOR_SLACK_BOT_TOKEN:-}" ]; then
+  echo "==> Slack configured: decisions will post to ${CONDUCTOR_SLACK_CHANNEL:-a channel}"
+  PARAMS+=( "SlackBotToken=${CONDUCTOR_SLACK_BOT_TOKEN}" "SlackSigningSecret=${CONDUCTOR_SLACK_SIGNING_SECRET:-}" "SlackChannel=${CONDUCTOR_SLACK_CHANNEL:-}" )
+fi
+if [ -n "${CONDUCTOR_SMTP_HOST:-}" ]; then
+  echo "==> Email (SMTP) configured: ${CONDUCTOR_SMTP_FROM:-}"
+  PARAMS+=( "SmtpHost=${CONDUCTOR_SMTP_HOST}" "SmtpPort=${CONDUCTOR_SMTP_PORT:-465}" "SmtpUser=${CONDUCTOR_SMTP_USER:-}" "SmtpFrom=${CONDUCTOR_SMTP_FROM:-}" "SmtpPassword=${CONDUCTOR_SMTP_PASSWORD:-}" "EmailTo=${CONDUCTOR_EMAIL_TO:-}" )
+fi
+if [ -n "${CONDUCTOR_IMAP_HOST:-}" ]; then
+  PARAMS+=( "ImapHost=${CONDUCTOR_IMAP_HOST}" "ImapUser=${CONDUCTOR_IMAP_USER:-}" "ImapPassword=${CONDUCTOR_IMAP_PASSWORD:-}" )
 fi
 
 echo "==> deploying App Runner service (CloudFormation)"
@@ -47,7 +55,7 @@ aws cloudformation deploy \
   --template-file deploy/apprunner.yaml \
   --stack-name conductor-web \
   --capabilities CAPABILITY_NAMED_IAM \
-  --parameter-overrides $PARAMS \
+  --parameter-overrides "${PARAMS[@]}" \
   --region "$REGION"
 
 URL="$(aws cloudformation describe-stacks --stack-name conductor-web \

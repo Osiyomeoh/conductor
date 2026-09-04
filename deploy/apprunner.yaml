@@ -21,6 +21,18 @@ Parameters:
     Type: String
     Default: gemini-3.5-flash
     Description: Force every Gemini role onto one model (free-tier keys only have flash).
+  SlackBotToken: { Type: String, Default: "", NoEcho: true }
+  SlackSigningSecret: { Type: String, Default: "", NoEcho: true }
+  SlackChannel: { Type: String, Default: "" }
+  SmtpHost: { Type: String, Default: "" }
+  SmtpPort: { Type: String, Default: "465" }
+  SmtpUser: { Type: String, Default: "" }
+  SmtpFrom: { Type: String, Default: "" }
+  SmtpPassword: { Type: String, Default: "", NoEcho: true }
+  ImapHost: { Type: String, Default: "" }
+  ImapUser: { Type: String, Default: "" }
+  ImapPassword: { Type: String, Default: "", NoEcho: true }
+  EmailTo: { Type: String, Default: "" }
 
 Resources:
   # App Runner assumes this role to pull the image from ECR.
@@ -107,6 +119,32 @@ Resources:
                 Value: !Ref GeminiApiKey
               - Name: CONDUCTOR_TABLE
                 Value: conductor-events    # durable log for real tenants (demo boards stay in-memory)
+              - Name: CONDUCTOR_SLACK_BOT_TOKEN
+                Value: !Ref SlackBotToken
+              - Name: CONDUCTOR_SLACK_SIGNING_SECRET
+                Value: !Ref SlackSigningSecret
+              - Name: CONDUCTOR_SLACK_CHANNEL
+                Value: !Ref SlackChannel
+              - Name: CONDUCTOR_SLACK_TENANT
+                Value: default
+              - Name: CONDUCTOR_SMTP_HOST
+                Value: !Ref SmtpHost
+              - Name: CONDUCTOR_SMTP_PORT
+                Value: !Ref SmtpPort
+              - Name: CONDUCTOR_SMTP_USER
+                Value: !Ref SmtpUser
+              - Name: CONDUCTOR_SMTP_FROM
+                Value: !Ref SmtpFrom
+              - Name: CONDUCTOR_SMTP_PASSWORD
+                Value: !Ref SmtpPassword
+              - Name: CONDUCTOR_IMAP_HOST
+                Value: !Ref ImapHost
+              - Name: CONDUCTOR_IMAP_USER
+                Value: !Ref ImapUser
+              - Name: CONDUCTOR_IMAP_PASSWORD
+                Value: !Ref ImapPassword
+              - Name: CONDUCTOR_EMAIL_TO
+                Value: !Ref EmailTo
       InstanceConfiguration:
         Cpu: "1024"                        # 1 vCPU
         Memory: "2048"                     # 2 GB
