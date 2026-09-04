@@ -99,19 +99,23 @@
   <div class="tasks">
 
     <div class="task" data-id="github">
-      <input type="checkbox" class="cbx" aria-label="Done: GitHub token">
+      <input type="checkbox" class="cbx" aria-label="Done: GitHub App">
       <div>
-        <div class="head"><span class="num">01</span><span class="t">GitHub access token</span><span class="chip now">Do now</span></div>
+        <div class="head"><span class="num">01</span><span class="t">Register a GitHub App</span><span class="chip now">Do now</span></div>
         <div class="unblocks">unblocks <b>Phase 1 — verified draft PRs on your real repo</b></div>
-        <div class="why">The fast path is a fine-grained Personal Access Token. A GitHub App is the production version, but a PAT proves the whole flow first and takes two minutes.</div>
+        <div class="why">The production identity: Conductor acts as its own bot (<code>conductor[bot]</code>) with short-lived, per-install tokens, not a personal token that acts as you. The App-auth code is built and tested; it just needs your App's id, private key and installation.</div>
         <ol class="steps">
-          <li>GitHub → <b>Settings → Developer settings → Personal access tokens → Fine-grained tokens → Generate new</b>.</li>
-          <li><b>Repository access:</b> only your one test repo.</li>
-          <li><b>Permissions:</b> Contents = <code>Read and write</code>, Pull requests = <code>Read and write</code>, Commit statuses = <code>Read and write</code>.</li>
-          <li>Generate, copy the token, and add it to <code>.env</code> (below). Tell me when it's in.</li>
+          <li>GitHub → <b>Settings → Developer settings → GitHub Apps → New GitHub App</b>. Name it, set any homepage URL, and for now <b>uncheck "Active" under Webhook</b> (we add webhooks in a later increment).</li>
+          <li><b>Repository permissions:</b> Contents = <code>Read and write</code>, Pull requests = <code>Read and write</code>, Commit statuses = <code>Read and write</code>.</li>
+          <li>Create the App, then <b>Generate a private key</b> (downloads a <code>.pem</code>). Note the <b>App ID</b> shown at the top.</li>
+          <li><b>Install App</b> on your one test repo. The URL after installing ends in <code>/installations/&lt;number&gt;</code> — that number is the <b>Installation ID</b>.</li>
+          <li>Save the <code>.pem</code> somewhere outside the repo and add the four values to <code>.env</code> (below). Tell me when it's in.</li>
         </ol>
-        <div class="env"><div class="lbl">add to .env</div><pre><span class="k">CONDUCTOR_GITHUB_TOKEN</span>=github_pat_...
+        <div class="env"><div class="lbl">add to .env</div><pre><span class="k">CONDUCTOR_GITHUB_APP_ID</span>=123456
+<span class="k">CONDUCTOR_GITHUB_INSTALLATION_ID</span>=42000000
+<span class="k">CONDUCTOR_GITHUB_PRIVATE_KEY_PATH</span>=/Users/you/secrets/conductor-app.pem
 <span class="k">CONDUCTOR_GITHUB_REPO</span>=your-org/your-repo</pre></div>
+        <div class="why" style="margin-top:10px;font-size:12.5px">Prefer not to build the App yet? A fine-grained <b>PAT</b> with the same three permissions also works: set <code>CONDUCTOR_GITHUB_TOKEN</code> + <code>CONDUCTOR_GITHUB_REPO</code> instead. The App wins if both are present.</div>
       </div>
     </div>
 

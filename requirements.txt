@@ -5,4 +5,6 @@ uvicorn[standard]
 bedrock-agentcore
 boto3
 google-genai
+PyJWT>=2.8
+cryptography
 pydantic

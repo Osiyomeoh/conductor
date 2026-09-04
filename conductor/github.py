@@ -165,11 +165,12 @@ import os  # noqa: E402
 
 
 def client_from_env() -> "GitHubClient | None":
-    """Build a client from CONDUCTOR_GITHUB_TOKEN + CONDUCTOR_GITHUB_REPO, or
-    None when they are not set. This is what gates the GitHub flow on."""
-    token = os.environ.get("CONDUCTOR_GITHUB_TOKEN")
-    repo = os.environ.get("CONDUCTOR_GITHUB_REPO")
-    return GitHubClient(token=token, repo=repo) if token and repo else None
+    """Build a client from the environment: a GitHub App installation when
+    configured (production), otherwise a PAT (the fast path), otherwise None.
+    Delegated so the App auth lives in one place; imported at call time to avoid
+    an import cycle (github_app imports this module)."""
+    from .github_app import client_from_env as _from_env
+    return _from_env()
 
 
 def clone(client: "GitHubClient", dest: str) -> str:
