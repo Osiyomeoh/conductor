@@ -164,6 +164,7 @@ def api_metrics():
            "escalations_raised": 0, "questions_asked": 0}
     spend = 0.0
     in_flight = 0
+    held_outcomes = regressed_outcomes = 0
     for tenant in registry.tenants():
         try:
             s = registry.read(tenant, state)
@@ -173,6 +174,8 @@ def api_metrics():
             agg[k] += s["metrics"].get(k, 0)
         spend += s["cost"].get("total", 0.0)
         in_flight += s.get("in_flight", 0)
+        held_outcomes += s.get("outcomes", {}).get("held", 0)
+        regressed_outcomes += s.get("outcomes", {}).get("regressed", 0)
     caught = agg["claims_rejected"]
     claims = agg["verified"] + caught
     catch_rate = (caught / claims) if claims else 0.0
@@ -198,6 +201,14 @@ def api_metrics():
         "# HELP conductor_spend_usd Total model spend across boards",
         "# TYPE conductor_spend_usd gauge",
         f"conductor_spend_usd {spend:.4f}",
+        "# HELP conductor_outcomes_held_total Outcomes that held after shipping",
+        "# TYPE conductor_outcomes_held_total counter",
+        f"conductor_outcomes_held_total {held_outcomes}",
+        "# TYPE conductor_outcomes_regressed_total counter",
+        f"conductor_outcomes_regressed_total {regressed_outcomes}",
+        "# HELP conductor_outcome_hold_rate Share of shipped outcomes that held",
+        "# TYPE conductor_outcome_hold_rate gauge",
+        f"conductor_outcome_hold_rate {(held_outcomes / (held_outcomes + regressed_outcomes)) if (held_outcomes + regressed_outcomes) else 0:.4f}",
     ]
     return Response("\n".join(lines) + "\n", media_type="text/plain; version=0.0.4")
 

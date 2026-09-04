@@ -98,6 +98,9 @@ def state(c) -> dict:
                  "per_verified": round(c.cost.cost_per_verified(), 4),
                  "by_model": {k: round(v, 4) for k, v in c.cost.by_model().items()}},
         "metrics": vars(c.metrics),
+        "outcomes": (getattr(c, "_outcome_memory", None).summary()
+                     if getattr(c, "_outcome_memory", None) is not None
+                     else {"held": 0, "regressed": 0, "hold_rate": None}),
         "events": [e[11:] for e in c.events[-40:]][::-1],
         "compression": c.surface.compression_ratio,
         "in_flight": sum(1 for x in g if x.status.value in ("dispatched", "claimed_done")),

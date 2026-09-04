@@ -86,15 +86,19 @@ class Conductor:
                 continue
             if cm.status not in (Status.VERIFYING, Status.WATCHING, Status.DONE):
                 continue
+            from .learning import attach as _attach
+            from .metrics import parse_outcome
             met, detail = evaluate(cm.evidence.spec, src)
             need = getattr(cm, "hold_required", 2)
             streak = getattr(cm, "hold_streak", 0)
+            _metric = (parse_outcome(cm.evidence.spec) or ("_",))[0]
             if met is True:
                 cm.hold_streak = streak + 1
                 if cm.hold_streak >= need:
                     if cm.status is not Status.DONE:
                         cm.status, cm.evidence.passed, cm.evidence.detail = Status.DONE, True, detail
                         cm.log(f"outcome held {cm.hold_streak}x: {detail}")
+                        _attach(self).record(_metric, True)     # reality's verdict: held
                         self.record(EventKind.VERIFIED, commitment_id=cm.id, note="outcome")
                 else:
                     cm.status = Status.WATCHING
@@ -105,6 +109,7 @@ class Conductor:
                 cm.evidence.detail = f"regressed: {detail}"
                 cm.hold_streak = 0
                 cm.log(f"outcome regressed, rolling back: {detail}")
+                _attach(self).record(_metric, False)         # reality's verdict: regressed
                 self._rollback(cm)
                 self.record(EventKind.REJECTED, commitment_id=cm.id, note="regression")
             else:
