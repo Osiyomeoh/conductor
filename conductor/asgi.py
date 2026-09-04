@@ -550,19 +550,30 @@ async def api_slack_interactive(request: Request):
 
 @app.post("/api/slack/deliver")
 async def api_slack_deliver(p: Principal = Depends(require("admin"))):
-    """Post this tenant's open decisions to the configured Slack channel."""
+    """Post the Slack tenant's open decisions to the channel. A Slack workspace
+    maps to one tenant (CONDUCTOR_SLACK_TENANT), the same one the interactive
+    endpoint answers, so a posted decision is the one a button click resolves. If
+    that board has no open decision yet, advance it so there is one to show."""
     import os as _os
     client = _slack_client()
     channel = _os.environ.get("CONDUCTOR_SLACK_CHANNEL")
     if client is None or not channel:
         raise HTTPException(status_code=503,
                             detail="set CONDUCTOR_SLACK_BOT_TOKEN and CONDUCTOR_SLACK_CHANNEL")
-    s = registry.read(p.tenant, state)
+    tenant = _os.environ.get("CONDUCTOR_SLACK_TENANT", "default")
+
+    def ensure(c):
+        s = state(c)
+        if not s.get("decisions"):
+            c.run(ticks=8)
+            s = state(c)
+        return s
+    s = await run_in_threadpool(lambda: registry.write(tenant, ensure))
     posted = 0
     for d in s.get("decisions", []):
         await run_in_threadpool(lambda d=d: client.post_decision(channel, d))
         posted += 1
-    return {"delivered": posted}
+    return {"delivered": posted, "tenant": tenant}
 
 
 # --- email delivery (your SMTP/IMAP) --------------------------------------
@@ -575,7 +586,15 @@ async def api_email_deliver(p: Principal = Depends(require("admin"))):
     to = _os.environ.get("CONDUCTOR_EMAIL_TO")
     if mailer is None or not to:
         raise HTTPException(status_code=503, detail="set CONDUCTOR_SMTP_* and CONDUCTOR_EMAIL_TO")
-    s = registry.read(p.tenant, state)
+    tenant = _os.environ.get("CONDUCTOR_EMAIL_TENANT", "default")
+
+    def ensure(c):
+        st = state(c)
+        if not st.get("decisions"):
+            c.run(ticks=8)
+            st = state(c)
+        return st
+    s = await run_in_threadpool(lambda: registry.write(tenant, ensure))
     sent = 0
     for d in s.get("decisions", []):
         subject, body = decision_email(d)
@@ -591,8 +610,10 @@ async def api_email_poll(p: Principal = Depends(require("admin"))):
     reader = reader_from_env()
     if reader is None:
         raise HTTPException(status_code=503, detail="set CONDUCTOR_IMAP_*")
+    import os as _os
+    tenant = _os.environ.get("CONDUCTOR_EMAIL_TENANT", "default")
     replies = await run_in_threadpool(reader.poll)
-    s = registry.read(p.tenant, state)
+    s = registry.read(tenant, state)
     options = {d["id"]: d.get("options", []) for d in s.get("decisions", [])}
     answered = []
     for did, text in replies:
@@ -605,7 +626,7 @@ async def api_email_poll(p: Principal = Depends(require("admin"))):
             c.run(ticks=4)
             return True
         try:
-            await run_in_threadpool(lambda do=do: registry.write(p.tenant, do))
+            await run_in_threadpool(lambda do=do: registry.write(tenant, do))
             answered.append({"decision": did, "choice": choice})
         except KeyError:
             pass
