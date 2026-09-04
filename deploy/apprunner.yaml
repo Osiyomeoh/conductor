@@ -37,12 +37,43 @@ Resources:
       ManagedPolicyArns:
         - arn:aws:iam::aws:policy/service-role/AWSAppRunnerServicePolicyForECRAccess
 
+  # The running task assumes this role. Anonymous demo boards are in-memory, but
+  # real (authenticated) tenants persist to the DynamoDB event log, so the task
+  # needs read/write on that table. secretsmanager:GetSecretValue is granted so
+  # the Gemini key can be moved out of a plaintext env var into Secrets Manager
+  # (reference it via RuntimeEnvironmentSecrets) without another role change.
+  InstanceRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: conductor-apprunner-instance
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal: { Service: tasks.apprunner.amazonaws.com }
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: conductor-runtime
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action: [dynamodb:PutItem, dynamodb:Query, dynamodb:GetItem, dynamodb:BatchWriteItem]
+                Resource: !Sub "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/conductor-events"
+              - Effect: Allow
+                Action: [secretsmanager:GetSecretValue]
+                Resource: !Sub "arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:conductor/*"
+              - Effect: Allow
+                Action: [bedrock:InvokeModel, bedrock:InvokeModelWithResponseStream]
+                Resource: "*"
+
   AutoScaling:
     Type: AWS::AppRunner::AutoScalingConfiguration
     Properties:
       AutoScalingConfigurationName: conductor-web1
-      # State is in-memory, so every viewer must hit the same instance. Pin to a
-      # single instance (min = max = 1) so the board a judge sees is coherent.
+      # Anonymous demo boards are in-memory, so a visitor must return to the same
+      # instance. Pinned to one instance (min = max = 1); real tenants persist to
+      # DynamoDB and would tolerate more, but the public demo is single-instance.
       MinSize: 1
       MaxSize: 1
       MaxConcurrency: 100
@@ -74,9 +105,12 @@ Resources:
                 Value: !Ref GeminiModel
               - Name: GEMINI_API_KEY
                 Value: !Ref GeminiApiKey
+              - Name: CONDUCTOR_TABLE
+                Value: conductor-events    # durable log for real tenants (demo boards stay in-memory)
       InstanceConfiguration:
         Cpu: "1024"                        # 1 vCPU
         Memory: "2048"                     # 2 GB
+        InstanceRoleArn: !GetAtt InstanceRole.Arn
       HealthCheckConfiguration:
         Protocol: HTTP
         Path: /api/health

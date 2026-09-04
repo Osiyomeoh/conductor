@@ -19,6 +19,7 @@ import uuid
 
 from fastapi import Depends, FastAPI, HTTPException, Request, Response
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
+from starlette.concurrency import run_in_threadpool
 
 from .auth import Principal, auth_required, mint_session, principal_from
 from .config import CONFIG
@@ -36,7 +37,20 @@ _REACT_INDEX = os.path.join(_WEB_DIST, "index.html")
 _REACT_BUILT = os.path.isfile(_REACT_INDEX)
 
 app = FastAPI(title="Conductor", version="1.0")
-registry = Registry(build_fn=lambda store, tenant: persistent(store=store, tenant=tenant))
+
+
+def _store_for(tenant: str):
+    """Anonymous demo visitors get an ephemeral in-memory board by design: they
+    are throwaway sessions, so persisting each one to DynamoDB would only cost
+    money and leave garbage rows. Real (authenticated) tenants get the durable
+    store configured for the deployment, so their state survives restarts."""
+    if tenant.startswith("demo_"):
+        from .events import MemoryStore
+        return MemoryStore()
+    return CONFIG.store()
+
+
+registry = Registry(build_fn=lambda _store, tenant: persistent(store=_store_for(tenant), tenant=tenant))
 
 
 import secrets
@@ -109,9 +123,12 @@ def client_key(request: Request, p: Principal) -> str:
 # --- API -------------------------------------------------------------------
 @app.get("/api/health")
 def health():
+    # NB: never expose the tenant list here. In demo mode the tenant id is the
+    # visitor's session key, so enumerating tenants would let anyone hijack
+    # another visitor's board by setting the cookie. Report a count only.
     return {"status": "ok", "provider": CONFIG.provider,
             "auth": "enforced" if auth_required() else "disabled",
-            "tenants": registry.tenants()}
+            "active_boards": registry.count()}
 
 
 @app.get("/api/state")
@@ -127,12 +144,6 @@ def api_team(p: Principal = Depends(caller)):
 @app.get("/api/activity")
 def api_activity(p: Principal = Depends(caller)):
     return registry.read(p.tenant, activity)
-
-
-@app.get("/api/plan")
-def api_plan(p: Principal = Depends(caller)):
-    from .planning import propose
-    return registry.read(p.tenant, lambda c: propose())
 
 
 @app.get("/api/decision")
@@ -181,12 +192,15 @@ async def api_real_run(request: Request, p: Principal = Depends(caller)):
     body = await _json(request)
     ticks = max(1, min(12, int(body.get("ticks", 8))))
     live = bool(body.get("live", False)) and live_available()
-    with _real_lock:
-        c = _real_conductor(live)
-        c.run(ticks=ticks)
-        s = real_state(c)
-        s["live"] = live
-        return s
+
+    def work():
+        with _real_lock:
+            c = _real_conductor(live)
+            c.run(ticks=ticks)          # git subprocesses: must not run on the event loop
+            s = real_state(c)
+            s["live"] = live
+            return s
+    return await run_in_threadpool(work)
 
 
 @app.post("/api/real/reset")
@@ -195,11 +209,14 @@ async def api_real_reset(request: Request, p: Principal = Depends(caller)):
     from .server import real_state
     body = await _json(request)
     live = bool(body.get("live", False)) and live_available()
-    with _real_lock:
-        if _real["repo"]:
-            shutil.rmtree(_real["repo"], ignore_errors=True)
-        _real["c"] = None
-        return real_state(_real_conductor(live))
+
+    def work():
+        with _real_lock:
+            if _real["repo"]:
+                shutil.rmtree(_real["repo"], ignore_errors=True)
+            _real["c"] = None
+            return real_state(_real_conductor(live))
+    return await run_in_threadpool(work)
 
 
 # --- connect your own repo (gated, local/authenticated) --------------------
@@ -244,10 +261,13 @@ async def api_repo_connect(request: Request, p: Principal = Depends(caller)):
     ok, resolved = validate_repo(body.get("path", ""))
     if not ok:
         raise HTTPException(status_code=400, detail=resolved)
-    with _repo_lock:
-        _repo["c"] = build_for_repo(resolved)
-        _repo["path"] = resolved
-        return _repo_payload()
+
+    def work():
+        with _repo_lock:
+            _repo["c"] = build_for_repo(resolved)   # git init/config: off the loop
+            _repo["path"] = resolved
+            return _repo_payload()
+    return await run_in_threadpool(work)
 
 
 @app.post("/api/repo/task")
@@ -273,9 +293,12 @@ async def api_repo_run(request: Request, p: Principal = Depends(caller)):
     if _repo["c"] is None:
         raise HTTPException(status_code=400, detail="connect a repository first")
     ticks = max(1, min(12, int(body.get("ticks", 6))))
-    with _repo_lock:
-        _repo["c"].run(ticks=ticks)
-        return _repo_payload()
+
+    def work():
+        with _repo_lock:
+            _repo["c"].run(ticks=ticks)     # git + live agent: off the event loop
+            return _repo_payload()
+    return await run_in_threadpool(work)
 
 
 @app.post("/api/repo/disconnect")
@@ -298,7 +321,8 @@ def api_reset(p: Principal = Depends(caller)):
 async def api_tick(request: Request, p: Principal = Depends(caller)):
     body = await _json(request)
     ticks = max(1, min(20, int(body.get("ticks", 1))))
-    return registry.write(p.tenant, lambda c: (c.run(ticks=ticks), state(c))[1])
+    return await run_in_threadpool(
+        lambda: registry.write(p.tenant, lambda c: (c.run(ticks=ticks), state(c))[1]))
 
 
 @app.post("/api/plan")
@@ -310,7 +334,8 @@ async def api_plan(request: Request, p: Principal = Depends(caller)):
     rate_limit(f"plan:{client_key(request, p)}", limit=12)
     body = await _json(request)
     intent = (body.get("intent") or "").strip()[:2000] or None    # cap: no unbounded prompt
-    return propose(intent, live=live_available())
+    live = live_available()
+    return await run_in_threadpool(lambda: propose(intent, live=live))   # model call: off the loop
 
 
 @app.post("/api/approve")
@@ -324,17 +349,21 @@ async def api_approve(request: Request, p: Principal = Depends(caller)):
     intent = (body.get("intent") or "").strip()[:2000]
     if not intent:
         raise HTTPException(status_code=400, detail="intent required")
-    made, _rejected, source, _plan = plan_commitments(intent, live=live_available())
+    live = live_available()
 
-    def do(c):
-        for cm in made:
-            c.graph.add(cm)
-        c.run(ticks=4)
-        s = state(c)
-        s["approved"] = len(made)
-        s["planned_by"] = source
-        return s
-    return registry.write(p.tenant, do)
+    def work():
+        made, _rejected, source, _plan = plan_commitments(intent, live=live)
+
+        def do(c):
+            for cm in made:
+                c.graph.add(cm)
+            c.run(ticks=4)
+            s = state(c)
+            s["approved"] = len(made)
+            s["planned_by"] = source
+            return s
+        return registry.write(p.tenant, do)
+    return await run_in_threadpool(work)
 
 
 @app.post("/api/answer")
@@ -348,7 +377,7 @@ async def api_answer(request: Request, p: Principal = Depends(caller)):
         c.run(ticks=4)
         return state(c)
     try:
-        return registry.write(p.tenant, do)
+        return await run_in_threadpool(lambda: registry.write(p.tenant, do))
     except KeyError:
         raise HTTPException(status_code=404, detail="unknown decision")
 
