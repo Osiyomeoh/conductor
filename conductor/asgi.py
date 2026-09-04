@@ -285,6 +285,13 @@ async def api_tracker_sync(p: Principal = Depends(require("admin"))):
     return await run_in_threadpool(lambda: registry.write(p.tenant, lambda c: sync(c, client)))
 
 
+@app.get("/api/marketplace")
+def api_marketplace(p: Principal = Depends(caller)):
+    """The hireable specialist agents, each rated by verified track record."""
+    from .marketplace import listing
+    return {"agents": registry.read(p.tenant, listing)}
+
+
 @app.post("/api/team/hire")
 async def api_team_hire(request: Request, p: Principal = Depends(require("admin"))):
     """Hire an agent for a kind of work. It joins the roster on probation and
