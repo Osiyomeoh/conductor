@@ -39,6 +39,7 @@ class Status(str, Enum):
     VERIFYING = "verifying"
     DONE = "done"                   # evidence passed
     REJECTED = "rejected"           # evidence failed; back to the worker
+    WATCHING = "watching"           # merged; watching the outcome hold before done
     BLOCKED = "blocked"
     AT_RISK = "at_risk"
     HELD = "held"                   # ready, but no review capacity to absorb it

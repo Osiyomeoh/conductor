@@ -93,6 +93,19 @@ class GitExecutor:
         _git(self.repo, "branch", "-D", branch, check=False)
         return True, "merged"
 
+    def revert(self, branch: str) -> tuple[bool, str]:
+        """Undo a merged branch after its outcome regressed: revert the merge
+        commit on the base, so reality is restored without rewriting history."""
+        r = _git(self.repo, "log", "--grep", f"conductor: merge {branch}",
+                 "--format=%H", "-n", "1", check=False)
+        sha = r.stdout.strip().splitlines()[0] if r.stdout.strip() else ""
+        if not sha:
+            return False, "no merge commit to revert"
+        rv = _git(self.repo, "revert", "--no-edit", "-m", "1", sha, check=False)
+        if rv.returncode != 0:
+            return False, (rv.stderr or rv.stdout).strip()[-200:]
+        return True, f"reverted merge {sha[:8]}"
+
     def discard(self, branch: str) -> None:
         """Throw away a branch and its worktree. A rejected or losing branch
         leaves no trace on the base."""

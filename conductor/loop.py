@@ -66,11 +66,59 @@ class Conductor:
     # ------------------------------------------------------------------
     def tick(self) -> None:
         self._verify_claims()
+        self._watch_outcomes()
         self._recover()
         self._surface_judgment()
         self._compress()
         self._speculate()
         self._dispatch()
+
+    def _watch_outcomes(self) -> None:
+        """Verify reality, and that it stays true. An outcome commitment is only
+        done once its metric has held the target for a few checks; if a done
+        outcome later regresses, roll the change back and reopen it. This is what
+        makes 'done' mean the metric moved and stayed moved, not just merged."""
+        from .metrics import evaluate
+        from .models import EvidenceKind
+        src = getattr(self.verifier, "metric_source", None)
+        for cm in self.graph:
+            if cm.evidence.kind is not EvidenceKind.OUTCOME:
+                continue
+            if cm.status not in (Status.VERIFYING, Status.WATCHING, Status.DONE):
+                continue
+            met, detail = evaluate(cm.evidence.spec, src)
+            need = getattr(cm, "hold_required", 2)
+            streak = getattr(cm, "hold_streak", 0)
+            if met is True:
+                cm.hold_streak = streak + 1
+                if cm.hold_streak >= need:
+                    if cm.status is not Status.DONE:
+                        cm.status, cm.evidence.passed, cm.evidence.detail = Status.DONE, True, detail
+                        cm.log(f"outcome held {cm.hold_streak}x: {detail}")
+                        self.record(EventKind.VERIFIED, commitment_id=cm.id, note="outcome")
+                else:
+                    cm.status = Status.WATCHING
+                    cm.log(f"outcome met ({cm.hold_streak}/{need}); watching")
+            elif cm.status is Status.DONE:
+                # Reality reversed after we believed it: reopen and roll back.
+                cm.status, cm.evidence.passed = Status.REJECTED, False
+                cm.evidence.detail = f"regressed: {detail}"
+                cm.hold_streak = 0
+                cm.log(f"outcome regressed, rolling back: {detail}")
+                self._rollback(cm)
+                self.record(EventKind.REJECTED, commitment_id=cm.id, note="regression")
+            else:
+                cm.hold_streak, cm.status = 0, Status.WATCHING
+
+    def _rollback(self, cm) -> None:
+        ex = self.executor
+        if ex is not None and getattr(cm, "branch", None) and hasattr(ex, "revert"):
+            try:
+                _ok, detail = ex.revert(cm.branch)
+                cm.log(f"rollback: {detail}")
+            except Exception as e:  # noqa: BLE001
+                cm.log(f"rollback failed: {e}")
+        self.emit(f"rolled back {cm.id} after outcome regression")
 
     def resume(self) -> int:
         """Fold the durable log back over the graph. The loop restarts from the
