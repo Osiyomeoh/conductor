@@ -310,6 +310,90 @@ def api_repo_disconnect(p: Principal = Depends(caller)):
         return {"enabled": True, "connected": False}
 
 
+# --- connect a GitHub repo (gated; verified work opens a draft PR) ----------
+_gh_lock = __import__("threading").RLock()
+_gh: dict = {"c": None, "repo": None, "dir": None}
+
+
+def _gh_ready():
+    """GitHub is available only when real execution is enabled AND a token is
+    configured. It runs task checks as real commands, so it stays behind the
+    same gate as local real-repo execution."""
+    from .github import client_from_env
+    from .userrepo import repo_enabled
+    return repo_enabled(), client_from_env()
+
+
+def _gh_payload():
+    from .server import real_state
+    enabled, client = _gh_ready()
+    out = {"enabled": enabled, "configured": client is not None,
+           "repo": client.repo if client else None, "connected": _gh["c"] is not None}
+    if _gh["c"] is not None:
+        out.update(real_state(_gh["c"]))
+    return out
+
+
+@app.get("/api/github")
+def api_github_status(p: Principal = Depends(caller)):
+    with _gh_lock:
+        return _gh_payload()
+
+
+@app.post("/api/github/connect")
+async def api_github_connect(p: Principal = Depends(caller)):
+    import shutil as _sh
+    import tempfile as _tf
+    from .github import build_for_github
+    enabled, client = _gh_ready()
+    if not enabled:
+        raise HTTPException(status_code=403, detail=(
+            "GitHub execution is disabled. It runs task checks as real commands, "
+            "so enable it deliberately with CONDUCTOR_ALLOW_REPO=1."))
+    if client is None:
+        raise HTTPException(status_code=400, detail=(
+            "set CONDUCTOR_GITHUB_TOKEN and CONDUCTOR_GITHUB_REPO (owner/name) first."))
+
+    def work():
+        with _gh_lock:
+            if _gh["dir"]:
+                _sh.rmtree(_gh["dir"], ignore_errors=True)
+            _gh["dir"] = _tf.mkdtemp(prefix="conductor-gh-")
+            _gh["c"] = build_for_github(client, _gh["dir"])
+            _gh["repo"] = client.repo
+            return _gh_payload()
+    return await run_in_threadpool(work)
+
+
+@app.post("/api/github/task")
+async def api_github_task(request: Request, p: Principal = Depends(caller)):
+    from .userrepo import add_task
+    body = await _json(request)
+    if _gh["c"] is None:
+        raise HTTPException(status_code=400, detail="connect the GitHub repo first")
+    for f in ("title", "file", "check"):
+        if not (body.get(f) or "").strip():
+            raise HTTPException(status_code=400, detail=f"{f} is required")
+    with _gh_lock:
+        add_task(_gh["c"], body["title"], body["file"], body["check"],
+                 body.get("work_kind", "code"))
+        return _gh_payload()
+
+
+@app.post("/api/github/run")
+async def api_github_run(request: Request, p: Principal = Depends(caller)):
+    body = await _json(request)
+    if _gh["c"] is None:
+        raise HTTPException(status_code=400, detail="connect the GitHub repo first")
+    ticks = max(1, min(12, int(body.get("ticks", 6))))
+
+    def work():
+        with _gh_lock:
+            _gh["c"].run(ticks=ticks)        # clone I/O, live agent, push, PR: off the loop
+            return _gh_payload()
+    return await run_in_threadpool(work)
+
+
 @app.post("/api/reset")
 def api_reset(p: Principal = Depends(caller)):
     """Rebuild this tenant from a fresh seed. The guided demo calls this so a

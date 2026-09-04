@@ -156,4 +156,37 @@ class GitHubExecutor(GitExecutor):
         if pr.get("number"):
             self.client.mark_ready(int(pr["number"]))
         self.close(branch)
-        return True, f"opened PR #{pr.get('number', '?')}"
+        url = pr.get("html_url") or f"https://github.com/{self.client.repo}/pull/{pr.get('number','')}"
+        return True, f"opened PR #{pr.get('number', '?')} {url}"
+
+
+# --- connect flow ---------------------------------------------------------
+import os  # noqa: E402
+
+
+def client_from_env() -> "GitHubClient | None":
+    """Build a client from CONDUCTOR_GITHUB_TOKEN + CONDUCTOR_GITHUB_REPO, or
+    None when they are not set. This is what gates the GitHub flow on."""
+    token = os.environ.get("CONDUCTOR_GITHUB_TOKEN")
+    repo = os.environ.get("CONDUCTOR_GITHUB_REPO")
+    return GitHubClient(token=token, repo=repo) if token and repo else None
+
+
+def clone(client: "GitHubClient", dest: str) -> str:
+    """Shallow-clone the repo over an authenticated URL. The token is used only
+    for this command and never written into the clone's remote config."""
+    url = f"https://x-access-token:{client.token}@github.com/{client.repo}.git"
+    subprocess.run(["git", "clone", "--depth", "1", url, dest],
+                   check=True, capture_output=True, text=True)
+    # Rewrite origin to a tokenless URL so a stray `git remote -v` never leaks it.
+    _git(dest, "remote", "set-url", "origin", f"https://github.com/{client.repo}.git")
+    return dest
+
+
+def build_for_github(client: "GitHubClient", dest: str, cloner=None):
+    """Clone the GitHub repo and return a Conductor whose verified work opens a
+    draft PR. `cloner` is injectable so the wiring is testable without network."""
+    from .userrepo import build_for_repo
+    (cloner or clone)(client, dest)
+    ex = GitHubExecutor(repo=dest, client=client)
+    return build_for_repo(dest, executor=ex)

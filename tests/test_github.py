@@ -118,7 +118,60 @@ def test_executor_merge_opens_draft_pr_and_marks_ready(tmp_path, monkeypatch):
 
     ok, detail = ex.merge("conductor/cm_1")
     assert ok and "PR #12" in detail
-    verbs = [(c["method"], c["url"].rsplit("/", 2)[-2] + "/" + c["url"].rsplit("/", 1)[-1]) for c in fake.calls]
     assert any(c["method"] == "POST" and c["url"].endswith("/pulls") for c in fake.calls)   # opened PR
     assert any(c["body"] == {"draft": False} for c in fake.calls if c["method"] == "PATCH")  # marked ready
     assert any(c["body"].get("state") == "success" for c in fake.calls if c["method"] == "POST" and "statuses" in c["url"])
+
+
+def test_build_for_github_wires_the_pr_executor(tmp_path):
+    """The connect flow clones (injected here) and hands the loop a Conductor
+    whose executor is the GitHub draft-PR executor carrying the client."""
+    import subprocess
+    from conductor.github import GitHubClient, GitHubExecutor, build_for_github
+
+    def fake_clone(client, dest):
+        for args in (["init", "-q", "-b", "main"], ["config", "user.email", "t@t"],
+                     ["config", "user.name", "t"]):
+            subprocess.run(["git", "-C", dest, *args], check=True)
+        (tmp_path / "README.md").write_text("# x\n")
+        subprocess.run(["git", "-C", dest, "add", "-A"], check=True)
+        subprocess.run(["git", "-C", dest, "commit", "-q", "-m", "base"], check=True)
+        return dest
+
+    client = GitHubClient(token="t", repo="acme/app", opener=FakeGitHub())
+    c = build_for_github(client, str(tmp_path), cloner=fake_clone)
+    assert isinstance(c.executor, GitHubExecutor)
+    assert c.executor.client is client
+
+
+def _api_client(monkeypatch, allow_repo, token):
+    import importlib, conductor.asgi as asgi
+    from fastapi.testclient import TestClient
+    monkeypatch.setenv("CONDUCTOR_REQUIRE_AUTH", "0")
+    if allow_repo:
+        monkeypatch.setenv("CONDUCTOR_ALLOW_REPO", "1")
+    else:
+        monkeypatch.delenv("CONDUCTOR_ALLOW_REPO", raising=False)
+    if token:
+        monkeypatch.setenv("CONDUCTOR_GITHUB_TOKEN", token)
+        monkeypatch.setenv("CONDUCTOR_GITHUB_REPO", "acme/app")
+    else:
+        monkeypatch.delenv("CONDUCTOR_GITHUB_TOKEN", raising=False)
+    importlib.reload(asgi)
+    return TestClient(asgi.app)
+
+
+def test_github_connect_is_gated(monkeypatch):
+    # disabled -> 403; enabled but no token -> 400
+    c = _api_client(monkeypatch, allow_repo=False, token=None)
+    assert c.get("/api/github").json()["enabled"] is False
+    assert c.post("/api/github/connect").status_code == 403
+
+    c = _api_client(monkeypatch, allow_repo=True, token=None)
+    s = c.get("/api/github").json()
+    assert s["enabled"] is True and s["configured"] is False
+    assert c.post("/api/github/connect").status_code == 400
+
+    c = _api_client(monkeypatch, allow_repo=True, token="ghp_x")
+    s = c.get("/api/github").json()
+    assert s["configured"] is True and s["repo"] == "acme/app" and s["connected"] is False

@@ -48,11 +48,15 @@ def validate_repo(path: str) -> tuple[bool, str]:
     return True, p
 
 
-def build_for_repo(repo_path: str, worker_factory=None) -> Conductor:
+def build_for_repo(repo_path: str, worker_factory=None, executor=None) -> Conductor:
     """A Conductor pointed at a real repo with an empty backlog. The agent is a
-    live Strands worker; work is added later with add_task()."""
+    live Strands worker; work is added later with add_task().
+
+    `executor` lets a caller swap where a pass lands: the default GitExecutor
+    merges into the local base, while a GitHubExecutor pushes the branch and
+    opens a draft PR instead. The loop is identical either way."""
     repo = os.path.abspath(os.path.expanduser(repo_path))
-    gx = GitExecutor(repo)
+    gx = executor or GitExecutor(repo)
 
     g = CommitmentGraph()
     g.add_resource(Resource("you", ResourceType.HUMAN, "You", ["product"]))
