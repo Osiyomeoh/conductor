@@ -274,6 +274,17 @@ def api_activity(p: Principal = Depends(caller)):
     return registry.read(p.tenant, activity)
 
 
+@app.post("/api/tracker/sync")
+async def api_tracker_sync(p: Principal = Depends(require("admin"))):
+    """Mirror this tenant's commitments to Linear and comment status changes."""
+    from .tracker import client_from_env, sync
+    client = client_from_env()
+    if client is None:
+        raise HTTPException(status_code=503,
+                            detail="set CONDUCTOR_LINEAR_API_KEY and CONDUCTOR_LINEAR_TEAM_ID")
+    return await run_in_threadpool(lambda: registry.write(p.tenant, lambda c: sync(c, client)))
+
+
 @app.post("/api/team/hire")
 async def api_team_hire(request: Request, p: Principal = Depends(require("admin"))):
     """Hire an agent for a kind of work. It joins the roster on probation and
