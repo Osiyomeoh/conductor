@@ -52,11 +52,12 @@ class Dispatcher:
             self.log.append(f"HELD  {cm.title}  ({budget.summary()})")
             return False
 
+        from .signals import classify
         action = Action(kind="dispatch", commitment_id=cm.id,
                         summary=f"dispatch {cm.title} to {worker.id}",
                         irreversible=False,
                         external=worker.type is ResourceType.HUMAN,
-                        payload={"touches_production": cm.consequential and not cm.branch})
+                        payload=classify(cm))       # real consequence signals
         verdict = self.policy.evaluate(action, worker)
         if verdict.decision is PolicyDecision.BLOCK:
             cm.status = Status.ESCALATED
