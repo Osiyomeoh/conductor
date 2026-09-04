@@ -84,7 +84,8 @@ class Conductor:
         for cm in self.graph:
             if cm.evidence.kind is not EvidenceKind.OUTCOME:
                 continue
-            if cm.status not in (Status.VERIFYING, Status.WATCHING, Status.DONE):
+            # Watched from creation: pending outcomes start watching immediately.
+            if cm.status not in (Status.PENDING, Status.VERIFYING, Status.WATCHING, Status.DONE):
                 continue
             from .learning import attach as _attach
             from .metrics import parse_outcome
@@ -281,11 +282,14 @@ class Conductor:
                 self._escalate(cm, cm.title, cm.options, key=f"judgment:{cm.id}")
 
     def _dispatch(self) -> None:
+        from .models import EvidenceKind
         # Cost governance: at or over the ceiling, stop spending. Ready work is
         # held with the reason rather than dispatched, so a runaway can only ever
         # cost up to the ceiling, and the held work resumes if the ceiling lifts.
         over_budget = self.cost_ceiling > 0 and self.cost.total >= self.cost_ceiling
         for cm in self.graph.ready():
+            if cm.evidence.kind is EvidenceKind.OUTCOME:
+                continue        # outcomes are watched, never dispatched to a worker
             if over_budget:
                 cm.status = Status.HELD
                 self.metrics.held += 1

@@ -18,7 +18,7 @@ def test_derive_appends_the_outcome_commitment():
     outcomes = [c for c in made if c.evidence.kind is EvidenceKind.OUTCOME]
     assert len(outcomes) == 1
     assert outcomes[0].evidence.spec == "onboarding >= 0.40"
-    assert outcomes[0].consequential is True          # the goal is the human's to accept
+    assert outcomes[0].consequential is False         # reality confirms it, not a person/worker
     assert len(made) >= 2                              # work commitments + the outcome
 
 

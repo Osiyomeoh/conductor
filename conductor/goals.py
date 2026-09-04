@@ -49,6 +49,7 @@ def derive(goal: Goal, live: bool = False, metric_source=None):
             Evidence(EvidenceKind.OUTCOME, spec=goal.outcome,
                      description="the goal's metric must hit its target and hold"),
             work_kind="outcome", review_cost_minutes=0)
-        outcome.consequential = True       # the goal is the human's to accept
+        # Not consequential and not dispatched: reality confirms it, not a person
+        # and not a worker. The loop watches it until the metric holds.
         made = list(made) + [outcome]
     return made, rejected, source
