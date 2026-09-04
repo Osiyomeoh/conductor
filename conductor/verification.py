@@ -15,10 +15,11 @@ from .models import Commitment, Evidence, EvidenceKind, Status, now
 
 class VerificationRunner:
     def __init__(self, workdir: str = ".", timeout: int = 120, dry_run: bool = False,
-                 runner=None):
+                 runner=None, metric_source=None):
         self.workdir = workdir
         self.timeout = timeout
         self.dry_run = dry_run
+        self.metric_source = metric_source     # answers outcome evidence; None = pending
         # Where a command check runs: on the host, in a container, or in the
         # cloud. Chosen from the environment unless a runner is passed in.
         if runner is None:
@@ -40,6 +41,11 @@ class VerificationRunner:
             # The repo's own CI is the judge. Stay pending until its result
             # arrives over the webhook; never believe the worker in the meantime.
             ev.passed, ev.detail = None, f"awaiting CI: {ev.spec or 'any required check'}"
+        elif ev.kind is EvidenceKind.OUTCOME:
+            # Verify reality, not work: done only when the metric hits its target.
+            # An unmet target is pending, not a lie, so the commitment is watched.
+            from .metrics import evaluate
+            ev.passed, ev.detail = evaluate(ev.spec, self.metric_source)
         elif ev.kind is EvidenceKind.COMMAND:
             ev.passed, ev.detail = self._command(ev.spec)
         elif ev.kind is EvidenceKind.FILE_EXISTS:
