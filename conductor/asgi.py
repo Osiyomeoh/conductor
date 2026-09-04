@@ -565,6 +565,53 @@ async def api_slack_deliver(p: Principal = Depends(require("admin"))):
     return {"delivered": posted}
 
 
+# --- email delivery (your SMTP/IMAP) --------------------------------------
+@app.post("/api/email/deliver")
+async def api_email_deliver(p: Principal = Depends(require("admin"))):
+    """Email this tenant's open decisions to CONDUCTOR_EMAIL_TO over your SMTP."""
+    import os as _os
+    from .mailer import decision_email, mailer_from_env
+    mailer = mailer_from_env()
+    to = _os.environ.get("CONDUCTOR_EMAIL_TO")
+    if mailer is None or not to:
+        raise HTTPException(status_code=503, detail="set CONDUCTOR_SMTP_* and CONDUCTOR_EMAIL_TO")
+    s = registry.read(p.tenant, state)
+    sent = 0
+    for d in s.get("decisions", []):
+        subject, body = decision_email(d)
+        await run_in_threadpool(lambda subject=subject, body=body: mailer.send(to, subject, body))
+        sent += 1
+    return {"emailed": sent}
+
+
+@app.post("/api/email/poll")
+async def api_email_poll(p: Principal = Depends(require("admin"))):
+    """Read unseen email replies over IMAP and answer the decisions they name."""
+    from .mailer import reader_from_env, resolve_choice
+    reader = reader_from_env()
+    if reader is None:
+        raise HTTPException(status_code=503, detail="set CONDUCTOR_IMAP_*")
+    replies = await run_in_threadpool(reader.poll)
+    s = registry.read(p.tenant, state)
+    options = {d["id"]: d.get("options", []) for d in s.get("decisions", [])}
+    answered = []
+    for did, text in replies:
+        choice = resolve_choice(text, options.get(did, []))
+        if not choice:
+            continue
+
+        def do(c, did=did, choice=choice):
+            c.answer(did, choice)
+            c.run(ticks=4)
+            return True
+        try:
+            await run_in_threadpool(lambda do=do: registry.write(p.tenant, do))
+            answered.append({"decision": did, "choice": choice})
+        except KeyError:
+            pass
+    return {"answered": answered}
+
+
 @app.post("/api/reset")
 def api_reset(p: Principal = Depends(require("admin"))):
     """Rebuild this tenant from a fresh seed. The guided demo calls this so a
