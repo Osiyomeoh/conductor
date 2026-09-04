@@ -120,14 +120,29 @@ def client_key(request: Request, p: Principal) -> str:
     return p.tenant if p.tenant != "default" else (request.client.host if request.client else "anon")
 
 
+def require(*roles: str):
+    """A dependency that authorizes by role. `require("admin")` gates a route to
+    admins (and admin is a superset of every role). In demo mode the principal
+    is admin, so the demo is unaffected."""
+    def dep(p: Principal = Depends(caller)) -> Principal:
+        if not p.has_role(*roles):
+            raise HTTPException(status_code=403,
+                                detail=f"requires role: {' or '.join(roles)}")
+        return p
+    return dep
+
+
 # --- API -------------------------------------------------------------------
 @app.get("/api/health")
 def health():
     # NB: never expose the tenant list here. In demo mode the tenant id is the
     # visitor's session key, so enumerating tenants would let anyone hijack
     # another visitor's board by setting the cookie. Report a count only.
-    return {"status": "ok", "provider": CONFIG.provider,
-            "auth": "enforced" if auth_required() else "disabled",
+    from .auth import oidc_configured
+    mode = "disabled"
+    if auth_required():
+        mode = "sso" if oidc_configured() else "session"
+    return {"status": "ok", "provider": CONFIG.provider, "auth": mode,
             "active_boards": registry.count()}
 
 

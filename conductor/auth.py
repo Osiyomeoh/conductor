@@ -31,10 +31,23 @@ class Principal:
     subject: str
     tenant: str
     email: str | None = None
+    roles: tuple[str, ...] = ()
+
+    def has_role(self, *roles: str) -> bool:
+        """Admin is a superset. Otherwise the principal must hold one of `roles`.
+        No roles required means any authenticated principal passes."""
+        if not roles:
+            return True
+        mine = set(self.roles)
+        return "admin" in mine or bool(mine.intersection(roles))
 
 
 def auth_required() -> bool:
     return os.environ.get("CONDUCTOR_REQUIRE_AUTH", "0") == "1"
+
+
+def oidc_configured() -> bool:
+    return bool(os.environ.get("CONDUCTOR_OIDC_ISSUER"))
 
 
 # --- session tokens --------------------------------------------------------
@@ -89,19 +102,33 @@ def verify_session(token: str) -> Principal | None:
         if payload.get("exp", 0) < time.time():
             return None
         return Principal(subject=payload["sub"], tenant=payload["tenant"],
-                         email=payload.get("email"))
+                         email=payload.get("email"),
+                         roles=tuple(payload.get("roles", ())))
     except Exception:  # noqa: BLE001
         return None
 
 
-def principal_from(headers, cookies) -> Principal | None:
-    """Resolve the caller. Disabled mode returns the demo principal; enforced
-    mode requires a valid session in the Authorization bearer or a cookie."""
-    if not auth_required():
-        return Principal(subject="demo", tenant=os.environ.get("CONDUCTOR_TENANT", "default"))
-    token = None
+def _bearer(headers, cookies) -> str | None:
     auth = headers.get("authorization") or headers.get("Authorization")
     if auth and auth.lower().startswith("bearer "):
-        token = auth[7:]
-    token = token or cookies.get("conductor_session")
-    return verify_session(token) if token else None
+        return auth[7:]
+    return cookies.get("conductor_session")
+
+
+def principal_from(headers, cookies) -> Principal | None:
+    """Resolve the caller. Disabled mode returns the demo principal (admin, so
+    the demo can drive everything). Enforced mode validates the bearer token:
+    against the OIDC provider (SSO) when one is configured, otherwise a
+    self-minted session."""
+    if not auth_required():
+        return Principal(subject="demo", tenant=os.environ.get("CONDUCTOR_TENANT", "default"),
+                         roles=("admin", "member", "approver"))
+    token = _bearer(headers, cookies)
+    if not token:
+        return None
+    if oidc_configured():
+        from .oidc import verifier_from_env
+        verifier = verifier_from_env()
+        if verifier is not None:
+            return verifier.verify(token)
+    return verify_session(token)
