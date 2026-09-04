@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { api } from "./api";
 import type { State, DecisionSummary, DecisionDetail, Team, Plan, Activity } from "./types";
-import { useCount } from "./hooks";
+import { useCount, useDictation } from "./hooks";
 
 const esc = (s: unknown) => String(s ?? "");
 
@@ -488,8 +488,13 @@ const DEFAULT_INTENT = "Next sprint I need the onboarding flow redesigned, the p
 
 export function PlanOverlay({ onClose, onApproved }: { onClose: () => void; onApproved: () => void }) {
   const [intent, setIntent] = useState(DEFAULT_INTENT);
+  const [interim, setInterim] = useState("");
   const [p, setP] = useState<Plan | null>(null);
   const [busy, setBusy] = useState(false);
+  const dictation = useDictation(
+    (phrase) => setIntent((prev) => (prev.trim() ? prev.trim() + " " : "") + phrase),
+    (text) => setInterim(text));
+  const mic = () => { if (dictation.listening) { dictation.stop(); setInterim(""); } else dictation.start(); };
 
   const generate = async () => { setBusy(true); try { setP(await api.plan(intent)); } finally { setBusy(false); } };
   const approve = async () => { setBusy(true); try { await api.approve(intent); onApproved(); onClose(); } finally { setBusy(false); } };
@@ -504,8 +509,18 @@ export function PlanOverlay({ onClose, onApproved }: { onClose: () => void; onAp
         {!p ? (
           <div>
             <div className="d-q" style={{ fontSize: 26, marginBottom: 8, maxWidth: "100%" }}>Describe your sprint.</div>
-            <div className="note" style={{ marginBottom: 18, fontSize: 13 }}>Say it in plain words. The planner turns it into commitments, each carrying the check that will prove it.</div>
-            <textarea className="intent-box" rows={5} value={intent} onChange={(e) => setIntent(e.target.value)} autoFocus />
+            <div className="note" style={{ marginBottom: 18, fontSize: 13 }}>Say it in plain words, out loud or typed. The planner turns it into commitments, each carrying the check that will prove it.</div>
+            <div className="intent-wrap">
+              <textarea className="intent-box" rows={5}
+                value={intent + (interim ? (intent.trim() ? " " : "") + interim : "")}
+                onChange={(e) => setIntent(e.target.value)} autoFocus />
+              {dictation.supported && (
+                <button type="button" className={`micbtn ${dictation.listening ? "on" : ""}`} onClick={mic}
+                  title={dictation.listening ? "Stop dictation" : "Speak your sprint"}>
+                  <span className="micdot" />{dictation.listening ? "Listening…" : "Speak"}
+                </button>
+              )}
+            </div>
             <div className="plan-foot">
               <span className="note">One conversation becomes a working team of people and agents.</span>
               <button className="b primary" onClick={generate} disabled={busy || !intent.trim()}>{busy ? "Planning…" : "Plan the sprint →"}</button>

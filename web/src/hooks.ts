@@ -41,6 +41,46 @@ export function useTheme(): [boolean, () => void] {
   return [dark, () => setDark((d) => !d)];
 }
 
+// Voice dictation via the browser's Web Speech API. No key, no backend: the
+// browser transcribes and we append each finalized phrase. Unsupported browsers
+// (notably Firefox) report supported=false, and the caller hides the control.
+type SR = { lang: string; interimResults: boolean; continuous: boolean;
+  onresult: ((e: unknown) => void) | null; onend: (() => void) | null;
+  onerror: (() => void) | null; start: () => void; stop: () => void };
+
+export function useDictation(onPhrase: (text: string) => void, onInterim?: (text: string) => void) {
+  const [listening, setListening] = useState(false);
+  const rec = useRef<SR | null>(null);
+  const supported = typeof window !== "undefined" &&
+    ("SpeechRecognition" in window || "webkitSpeechRecognition" in window);
+
+  const stop = useCallback(() => { try { rec.current?.stop(); } catch { /* */ } setListening(false); }, []);
+
+  const start = useCallback(() => {
+    if (!supported) return;
+    const Ctor = (window as unknown as Record<string, new () => SR>).SpeechRecognition
+      || (window as unknown as Record<string, new () => SR>).webkitSpeechRecognition;
+    const r = new Ctor();
+    r.lang = "en-US"; r.interimResults = true; r.continuous = true;
+    r.onresult = (e: unknown) => {
+      const ev = e as { resultIndex: number; results: ArrayLike<{ 0: { transcript: string }; isFinal: boolean }> };
+      let final = "", interim = "";
+      for (let i = ev.resultIndex; i < ev.results.length; i++) {
+        const seg = ev.results[i][0].transcript;
+        if (ev.results[i].isFinal) final += seg; else interim += seg;
+      }
+      if (final) onPhrase(final.trim());
+      if (interim && onInterim) onInterim(interim.trim());
+    };
+    r.onend = () => setListening(false);
+    r.onerror = () => setListening(false);
+    try { r.start(); rec.current = r; setListening(true); } catch { setListening(false); }
+  }, [supported, onPhrase, onInterim]);
+
+  useEffect(() => () => { try { rec.current?.stop(); } catch { /* */ } }, []);
+  return { supported, listening, start, stop };
+}
+
 // Count-up on a changing number, so the hero figures animate like the vanilla app.
 export function useCount(to: number): number {
   const [v, setV] = useState(to);
