@@ -49,6 +49,7 @@ class EvidenceKind(str, Enum):
     COMMAND = "command"       # a shell command must exit 0
     FILE_EXISTS = "file"      # a path must exist and be non-empty
     HTTP_OK = "http"          # an endpoint must respond
+    CI = "ci"                 # the repo's own CI must pass (resolved async by webhook)
     HUMAN_REVIEW = "review"   # only a person can confirm this one
     NONE = "none"             # unverifiable; treated as a planning defect
 

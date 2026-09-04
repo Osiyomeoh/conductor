@@ -40,6 +40,26 @@ def _pr_record(conductor, number: int):
     return None
 
 
+def _resolve_ci(conductor, branch: str, ok: bool):
+    """Let the repo's CI be the verdict: find the commitment on this branch whose
+    evidence is CI and still pending, and resolve it. This is the only place a CI
+    result becomes 'done' — the worker's claim never was believed."""
+    from .models import EvidenceKind, Status
+    g = getattr(conductor, "graph", None)
+    if g is None or not branch:
+        return None
+    for cm in g:
+        if (cm.branch == branch and cm.evidence.kind is EvidenceKind.CI
+                and cm.evidence.passed is None):
+            cm.evidence.passed = ok
+            cm.evidence.detail = "CI passed" if ok else "CI failed"
+            cm.status = Status.DONE if ok else Status.REJECTED
+            cm.log(f"CI {'passed' if ok else 'failed'} on {branch}")
+            conductor.emit(f"CI {'passed' if ok else 'failed'} for {cm.id} on {branch}")
+            return cm.id
+    return None
+
+
 def handle_event(event_type: str, payload: dict, conductor) -> dict:
     """Route a verified event to an effect on the connected conductor. Returns a
     small summary of what was recorded. Unknown events are acknowledged and
@@ -49,6 +69,29 @@ def handle_event(event_type: str, payload: dict, conductor) -> dict:
 
     if event_type == "ping":
         return {"handled": True, "event": "ping"}
+
+    if event_type == "check_suite":
+        cs = payload.get("check_suite", {}) or {}
+        if payload.get("action") == "completed":
+            ok = cs.get("conclusion") == "success"
+            cid = _resolve_ci(conductor, cs.get("head_branch", ""), ok)
+            return {"handled": bool(cid), "event": "ci",
+                    "result": "pass" if ok else "fail", "commitment": cid}
+        return {"handled": True, "event": f"check_suite.{payload.get('action')}"}
+
+    if event_type == "status":
+        # Ignore our own status (context conductor/*); only the repo's real CI is
+        # the CI verdict.
+        if (payload.get("context") or "").startswith("conductor/"):
+            return {"handled": True, "event": "status.self"}
+        state = payload.get("state")
+        if state in ("success", "failure"):
+            for b in payload.get("branches", []) or []:
+                cid = _resolve_ci(conductor, b.get("name", ""), state == "success")
+                if cid:
+                    return {"handled": True, "event": "ci",
+                            "result": "pass" if state == "success" else "fail", "commitment": cid}
+        return {"handled": True, "event": f"status.{state}"}
 
     if event_type == "pull_request":
         pr = payload.get("pull_request", {}) or {}

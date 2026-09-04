@@ -36,6 +36,10 @@ class VerificationRunner:
             ev.passed, ev.detail = False, "no evidence requirement defined at plan time"
         elif ev.kind is EvidenceKind.HUMAN_REVIEW:
             ev.passed, ev.detail = None, "requires a person"
+        elif ev.kind is EvidenceKind.CI:
+            # The repo's own CI is the judge. Stay pending until its result
+            # arrives over the webhook; never believe the worker in the meantime.
+            ev.passed, ev.detail = None, f"awaiting CI: {ev.spec or 'any required check'}"
         elif ev.kind is EvidenceKind.COMMAND:
             ev.passed, ev.detail = self._command(ev.spec)
         elif ev.kind is EvidenceKind.FILE_EXISTS:
