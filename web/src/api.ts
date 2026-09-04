@@ -42,9 +42,15 @@ async function post<T>(path: string, body: unknown): Promise<T> {
   if (!r.ok) throw new Error(`${path} -> ${r.status}`);
   return r.json() as Promise<T>;
 }
+async function del<T>(path: string): Promise<T> {
+  const r = await fetch(path, { method: "DELETE", headers: authHeaders({ accept: "application/json" }) });
+  if (!r.ok) throw new Error(`${path} -> ${r.status}`);
+  return r.json() as Promise<T>;
+}
 
 export interface WhoAmI { subject: string; tenant: string; email: string | null; roles: string[]; }
 export interface AuthConfig { mode: "disabled" | "session" | "sso"; login_url: string | null; }
+export interface OrgMember { subject: string; role: string; email: string | null; added_by: string | null; }
 
 // Capture a token from the redirect fragment immediately on load, before the
 // router rewrites the hash.
@@ -74,4 +80,7 @@ export const api = {
   githubRun: (ticks: number) => post<GitHubState>("/api/github/run", { ticks }),
   whoami: () => get<WhoAmI>("/api/whoami"),
   authConfig: () => get<AuthConfig>("/api/auth/config"),
+  members: () => get<{ members: OrgMember[] }>("/api/members"),
+  addMember: (m: { subject: string; role: string; email?: string }) => post<{ members: OrgMember[] }>("/api/members", m),
+  removeMember: (subject: string) => del<{ members: OrgMember[] }>(`/api/members/${encodeURIComponent(subject)}`),
 };

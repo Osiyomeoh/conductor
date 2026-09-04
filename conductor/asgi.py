@@ -104,7 +104,14 @@ def caller(request: Request) -> Principal:
         p = principal_from(request.headers, request.cookies)
         if p is None:
             raise HTTPException(status_code=401, detail="authentication required")
-        return p
+        # The token proves identity; workspace membership decides the role. The
+        # first authenticated user of an empty workspace owns it; anyone not a
+        # member is authenticated but has no access here.
+        from .membership import memberships
+        role = memberships.ensure_owner(p.tenant, p.subject, p.email)
+        if role is None:
+            raise HTTPException(status_code=403, detail="not a member of this workspace")
+        return Principal(subject=p.subject, tenant=p.tenant, email=p.email, roles=(role,))
     # Demo mode: each visitor gets an isolated board keyed by a cookie, so one
     # visitor cannot reset or drive another's, and two judges never collide on
     # one shared board.
@@ -165,6 +172,43 @@ def api_auth_config():
     if auth_required():
         mode = "sso" if oidc_configured() else "session"
     return {"mode": mode, "login_url": _os.environ.get("CONDUCTOR_OIDC_LOGIN_URL")}
+
+
+def _members_payload(tenant: str) -> dict:
+    from .membership import memberships
+    return {"members": [{"subject": m.subject, "role": m.role, "email": m.email,
+                         "added_by": m.added_by} for m in memberships.members(tenant)]}
+
+
+@app.get("/api/members")
+def api_members(p: Principal = Depends(caller)):
+    """Everyone in this workspace and their role."""
+    return _members_payload(p.tenant)
+
+
+@app.post("/api/members")
+async def api_member_add(request: Request, p: Principal = Depends(require("admin"))):
+    """Invite/add a member. Admin only. The subject is the user's identity from
+    the identity provider (its `sub`); email is for display."""
+    from .membership import ROLES, memberships
+    body = await _json(request)
+    subject = (body.get("subject") or "").strip()
+    role = (body.get("role") or "member").strip()
+    if not subject:
+        raise HTTPException(status_code=400, detail="subject required")
+    if role not in ROLES:
+        raise HTTPException(status_code=400, detail=f"role must be one of {ROLES}")
+    memberships.add(p.tenant, subject, role, (body.get("email") or "").strip() or None, by=p.subject)
+    return _members_payload(p.tenant)
+
+
+@app.delete("/api/members/{subject}")
+def api_member_remove(subject: str, p: Principal = Depends(require("admin"))):
+    from .membership import memberships
+    if subject == p.subject:
+        raise HTTPException(status_code=400, detail="you cannot remove yourself")
+    memberships.remove(p.tenant, subject)
+    return _members_payload(p.tenant)
 
 
 @app.get("/api/state")

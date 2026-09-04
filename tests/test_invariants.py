@@ -594,6 +594,8 @@ def test_server_state_survives_restart(tmp_path):
 def _client():
     from fastapi.testclient import TestClient
     import importlib, conductor.asgi as asgi
+    from conductor.membership import memberships
+    memberships._by_tenant.clear()   # fresh workspace membership per client (no reload churn)
     importlib.reload(asgi)
     return TestClient(asgi.app), asgi
 
@@ -696,8 +698,11 @@ def test_asgi_rbac_gates_admin_routes(monkeypatch):
     monkeypatch.setenv("CONDUCTOR_SESSION_SECRET", "test-secret")
     c, _ = _client()
     from conductor.auth import mint_session
-    member = {"authorization": "Bearer " + mint_session("u", "acme", roles=("member",))}
-    admin = {"authorization": "Bearer " + mint_session("a", "acme", roles=("admin",))}
+    # Membership is the role authority: the first user of the workspace owns it.
+    admin = {"authorization": "Bearer " + mint_session("a", "acme")}
+    assert c.get("/api/whoami", headers=admin).json()["roles"] == ["admin"]   # bootstrap
+    c.post("/api/members", headers=admin, json={"subject": "u", "role": "member"})
+    member = {"authorization": "Bearer " + mint_session("u", "acme")}
     assert c.get("/api/whoami", headers=member).json()["roles"] == ["member"]
     assert c.post("/api/reset", headers=member).status_code == 403       # admin-only
     assert c.post("/api/reset", headers=admin).status_code == 200

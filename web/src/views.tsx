@@ -498,6 +498,60 @@ CONDUCTOR_GITHUB_REPO=owner/name python serve.py</pre></>
   </>);
 }
 
+function MembersPanel() {
+  const [members, setMembers] = useState<import("./api").OrgMember[]>([]);
+  const [me, setMe] = useState<import("./api").WhoAmI | null>(null);
+  const [form, setForm] = useState({ subject: "", email: "", role: "member" });
+  const [err, setErr] = useState<string | null>(null);
+  useEffect(() => {
+    void api.members().then((r) => setMembers(r.members)).catch(() => {});
+    void api.whoami().then(setMe).catch(() => {});
+  }, []);
+  const isAdmin = !!me?.roles.includes("admin");
+  const add = async () => {
+    setErr(null);
+    try { const r = await api.addMember(form); setMembers(r.members); setForm({ subject: "", email: "", role: "member" }); }
+    catch (e) { setErr(e instanceof Error ? e.message : "failed"); }
+  };
+  const remove = async (s: string) => {
+    try { const r = await api.removeMember(s); setMembers(r.members); } catch { /* ignore */ }
+  };
+  return (
+    <div className="section" style={{ marginBottom: 26 }}>
+      <div className="label">Workspace members {me && <span className="dim mono">· you are {me.roles.join(", ")}</span>}</div>
+      <div className="card">
+        {members.length === 0 && <div className="note" style={{ padding: 16 }}>No members yet. In enforced auth, the first person to sign in owns the workspace.</div>}
+        {members.map((m) => (
+          <div className="row" style={{ gridTemplateColumns: "1fr auto auto" }} key={m.subject}>
+            <div><div className="t">{m.email || m.subject}</div><div className="why mono">{m.subject}</div></div>
+            <span className={`tpill ${m.role === "admin" ? "t-trusted" : "t-human"}`}>{m.role}</span>
+            {isAdmin && m.subject !== me?.subject
+              ? <button className="b" onClick={() => void remove(m.subject)}>Remove</button>
+              : <span />}
+          </div>
+        ))}
+      </div>
+      {isAdmin && (
+        <div className="card taskcard" style={{ marginTop: 12 }}>
+          <div className="label">Add a member</div>
+          {err && <div className="errcard" style={{ marginBottom: 10 }}>{err}</div>}
+          <div className="taskgrid" style={{ gridTemplateColumns: "1fr 1fr auto auto" }}>
+            <input className="input mono" placeholder="user id (their SSO 'sub')" value={form.subject}
+              onChange={(e) => setForm({ ...form, subject: e.target.value })} />
+            <input className="input" placeholder="email (for display)" value={form.email}
+              onChange={(e) => setForm({ ...form, email: e.target.value })} />
+            <select className="input" value={form.role} onChange={(e) => setForm({ ...form, role: e.target.value })}>
+              <option value="admin">admin</option><option value="approver">approver</option>
+              <option value="member">member</option><option value="viewer">viewer</option>
+            </select>
+            <button className="b" onClick={() => void add()} disabled={!form.subject.trim()}>Add</button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export function TeamView() {
   const [t, setT] = useState<Team | null>(null);
   useEffect(() => { void api.team().then(setT); }, []);
@@ -505,6 +559,7 @@ export function TeamView() {
   return (<>
     <Head title="Team" sub="humans and agents, one roster" />
     <div className="vbody"><div className="vwrap">
+      <MembersPanel />
       {t.proposals.map((p) => (
         <div key={p.kind} className="card panel" style={{ border: "1px solid var(--held)", background: "var(--held-bg)", marginBottom: 24 }}>
           <div className="label" style={{ color: "var(--held)" }}>Hiring proposal</div>
