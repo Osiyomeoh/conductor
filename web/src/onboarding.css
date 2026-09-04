@@ -5,7 +5,7 @@ body{background:var(--ground);color:var(--t1);font-family:var(--sans);font-size:
   line-height:1.55;-webkit-font-smoothing:antialiased;letter-spacing:-.006em}
 .mono{font-family:var(--mono)}
 
-.split{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.05fr);height:100vh}
+.split{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.05fr);min-height:100vh}
 @media(max-width:860px){.split{grid-template-columns:1fr}.right{display:none}}
 
 /* left: the form */

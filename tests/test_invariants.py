@@ -658,6 +658,31 @@ def test_asgi_repo_flow_gated_and_validated(monkeypatch, tmp_path):
     assert r.status_code == 200 and len(r.json()["board"]) == 1
 
 
+def test_asgi_demo_visitors_are_isolated_and_rate_limited(monkeypatch):
+    """In demo mode each visitor gets their own cookie-scoped board (one cannot
+    reset or drive another's), the planner is rate limited, and an oversized
+    intent is capped rather than passed through to the model."""
+    monkeypatch.setenv("CONDUCTOR_REQUIRE_AUTH", "0")
+    c, asgi = _client()
+    asgi._rate.clear()
+    from fastapi.testclient import TestClient
+
+    a, b = TestClient(asgi.app), TestClient(asgi.app)
+    a.post("/api/tick", json={"ticks": 6})                    # A drives its board
+    assert a.get("/api/state").json()["metrics"]["verified"] >= 1
+    assert b.get("/api/state").json()["metrics"]["verified"] == 0   # B is untouched
+    assert a.cookies.get("conductor_demo") != b.cookies.get("conductor_demo")
+
+    # Rate limit: the 13th plan in the window is rejected.
+    codes = [a.post("/api/plan", json={"intent": "x"}).status_code for _ in range(14)]
+    assert codes.count(200) == 12 and 429 in codes
+
+    # Oversized intent is capped, not forwarded whole.
+    asgi._rate.clear()
+    r = b.post("/api/plan", json={"intent": "a" * 10000})
+    assert r.status_code == 200
+
+
 def test_asgi_enforced_auth_and_tenant_isolation(monkeypatch):
     monkeypatch.setenv("CONDUCTOR_REQUIRE_AUTH", "1")
     monkeypatch.setenv("CONDUCTOR_SESSION_SECRET", "test-secret")

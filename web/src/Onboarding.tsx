@@ -2,9 +2,6 @@ import { useState } from "react";
 import "./onboarding.css";
 import { Glyph } from "./logo";
 
-const G = <svg width="15" height="15" viewBox="0 0 24 24"><path fill="#fff" d="M23 12.3c0-.8-.1-1.6-.2-2.3H12v4.5h6.2a5.3 5.3 0 0 1-2.3 3.5v2.9h3.7c2.2-2 3.4-5 3.4-8.6z" /><path fill="#fff" opacity=".8" d="M12 24c3.1 0 5.7-1 7.6-2.8l-3.7-2.9c-1 .7-2.3 1.1-3.9 1.1-3 0-5.5-2-6.4-4.7H1.8v3C3.7 21.4 7.5 24 12 24z" /></svg>;
-const GH = <svg width="15" height="15" viewBox="0 0 24 24" fill="#fff"><path d="M12 .5A11.5 11.5 0 0 0 .5 12a11.5 11.5 0 0 0 7.9 10.9c.6.1.8-.2.8-.5v-2c-3.2.7-3.9-1.4-3.9-1.4-.5-1.3-1.3-1.7-1.3-1.7-1-.7.1-.7.1-.7 1.2.1 1.8 1.2 1.8 1.2 1 1.8 2.8 1.3 3.5 1 .1-.8.4-1.3.7-1.6-2.6-.3-5.3-1.3-5.3-5.7 0-1.3.4-2.3 1.2-3.1-.1-.3-.5-1.5.1-3.1 0 0 1-.3 3.3 1.2a11.5 11.5 0 0 1 6 0C17 4.6 18 4.9 18 4.9c.6 1.6.2 2.8.1 3.1.8.8 1.2 1.8 1.2 3.1 0 4.4-2.7 5.4-5.3 5.7.4.4.8 1.1.8 2.2v3.3c0 .3.2.6.8.5A11.5 11.5 0 0 0 23.5 12 11.5 11.5 0 0 0 12 .5z" /></svg>;
-
 function Toggle() {
   const [on, setOn] = useState(true);
   return <div className={`sw ${on ? "on" : ""}`} onClick={() => setOn((v) => !v)}><i /></div>;
@@ -17,9 +14,8 @@ export function Onboarding({ go }: { go: (path: string) => void }) {
   const next = () => { if (finish) go("/app"); else setI((x) => x + 1); };
 
   const steps = [
-    { title: "Create your workspace", lede: "One place where your team and its agents move work forward.", primary: "Create workspace", skip: false,
+    { title: "Create your workspace", lede: "A quick walkthrough of the demo. Nothing here signs you up; your board is created the moment you enter.", primary: "Create workspace", skip: false,
       body: <>
-        <div className="sso"><button onClick={next}>{G} Google</button><button onClick={next}>{GH} GitHub</button></div>
         <div className="field"><label>Workspace name</label><input className="input" placeholder="Acme" /></div>
         <div className="field"><label>Workspace URL</label><div className="urlrow"><span className="pfx">conductor.app/</span><input placeholder="acme" /></div></div>
         <div className="rowfields"><div className="field"><label>Region</label><select className="select"><option>United States</option><option>European Union</option></select></div></div>
@@ -41,7 +37,7 @@ export function Onboarding({ go }: { go: (path: string) => void }) {
           <div className="crow"><h4>Verified merges</h4><p>Nothing reaches your base branch on a worker's word.</p></div>
           <div className="crow"><h4>Trust that compounds</h4><p>Agents earn a lighter check as they prove out.</p></div>
         </div>
-        <div className="sso"><button onClick={next}>{GH} Connect GitHub</button></div>
+        <div className="foot">In the live app this connects a real repo (gated behind a flag, local only). The demo runs on an isolated sandbox.</div>
       </> },
     { title: "You're set.", lede: "Conductor runs the loop and surfaces only the decisions that need you. On a good day, it stays quiet.", primary: "Enter Conductor", skip: false,
       body: <>

@@ -39,6 +39,30 @@ app = FastAPI(title="Conductor", version="1.0")
 registry = Registry(build_fn=lambda store, tenant: persistent(store=store, tenant=tenant))
 
 
+import secrets
+
+# In-process rate limiter for the expensive endpoints. The public demo has auth
+# disabled, so without this a single visitor could loop the planner and drain
+# the model quota, or hammer the git-worktree runner. Fixed window per key.
+_rate: dict[str, list] = {}
+
+
+def rate_limit(key: str, limit: int, window: float = 60.0):
+    now = time.time()
+    if len(_rate) > 4000:                      # bound memory under abuse
+        cutoff = now - window
+        for k in [k for k, v in _rate.items() if v[0] < cutoff]:
+            _rate.pop(k, None)
+    bucket = _rate.get(key)
+    if bucket is None or now - bucket[0] > window:
+        _rate[key] = [now, 1]
+        return
+    if bucket[1] >= limit:
+        raise HTTPException(status_code=429,
+                            detail="too many requests; slow down and try again shortly")
+    bucket[1] += 1
+
+
 @app.middleware("http")
 async def observe(request: Request, call_next):
     rid = uuid.uuid4().hex[:8]
@@ -53,14 +77,33 @@ async def observe(request: Request, call_next):
     log.info("rid=%s %s %s -> %d %.1fms", rid, request.method, request.url.path,
              response.status_code, ms)
     response.headers["x-request-id"] = rid
+    # Persist a per-visitor demo tenant so each browser gets its own board.
+    token = getattr(request.state, "set_demo_tenant", None)
+    if token:
+        response.set_cookie("conductor_demo", token, httponly=True, samesite="lax",
+                            secure=request.url.scheme == "https", max_age=604800)
     return response
 
 
 def caller(request: Request) -> Principal:
-    p = principal_from(request.headers, request.cookies)
-    if p is None:
-        raise HTTPException(status_code=401, detail="authentication required")
-    return p
+    if auth_required():
+        p = principal_from(request.headers, request.cookies)
+        if p is None:
+            raise HTTPException(status_code=401, detail="authentication required")
+        return p
+    # Demo mode: each visitor gets an isolated board keyed by a cookie, so one
+    # visitor cannot reset or drive another's, and two judges never collide on
+    # one shared board.
+    tenant = request.cookies.get("conductor_demo") or ""
+    if not (tenant.startswith("demo_") and len(tenant) <= 40 and tenant[5:].isalnum()):
+        tenant = "demo_" + secrets.token_hex(8)
+        request.state.set_demo_tenant = tenant
+    return Principal(subject="demo", tenant=tenant)
+
+
+def client_key(request: Request, p: Principal) -> str:
+    """A rate-limit key: the visitor's tenant, falling back to peer IP."""
+    return p.tenant if p.tenant != "default" else (request.client.host if request.client else "anon")
 
 
 # --- API -------------------------------------------------------------------
@@ -134,6 +177,7 @@ def api_real_state(p: Principal = Depends(caller)):
 async def api_real_run(request: Request, p: Principal = Depends(caller)):
     from .planning import live_available
     from .server import real_state
+    rate_limit(f"real:{client_key(request, p)}", limit=10)
     body = await _json(request)
     ticks = max(1, min(12, int(body.get("ticks", 8))))
     live = bool(body.get("live", False)) and live_available()
@@ -263,8 +307,9 @@ async def api_plan(request: Request, p: Principal = Depends(caller)):
     Planner when a provider is configured, and a fixture otherwise, both through
     the same evidence gate."""
     from .planning import live_available, propose
+    rate_limit(f"plan:{client_key(request, p)}", limit=12)
     body = await _json(request)
-    intent = (body.get("intent") or "").strip() or None
+    intent = (body.get("intent") or "").strip()[:2000] or None    # cap: no unbounded prompt
     return propose(intent, live=live_available())
 
 
@@ -274,8 +319,9 @@ async def api_approve(request: Request, p: Principal = Depends(caller)):
     running conductor and start the loop. This is the whole arc, from one
     conversation to a team doing the work."""
     from .planning import live_available, plan_commitments
+    rate_limit(f"approve:{client_key(request, p)}", limit=12)
     body = await _json(request)
-    intent = (body.get("intent") or "").strip()
+    intent = (body.get("intent") or "").strip()[:2000]
     if not intent:
         raise HTTPException(status_code=400, detail="intent required")
     made, _rejected, source, _plan = plan_commitments(intent, live=live_available())

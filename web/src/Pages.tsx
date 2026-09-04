@@ -1,3 +1,4 @@
+import { useState } from "react";
 import "./landing.css";
 import "./pages.css";
 import { MarketingFooter, MarketingNav } from "./chrome";
@@ -83,17 +84,26 @@ export function NowPage({ go }: { go: (p: string) => void }) {
 }
 
 export function ContactPage({ go }: { go: (p: string) => void }) {
+  const [sent, setSent] = useState(false);
   return <Shell go={go}>
     <PageHero eyebrow="Contact" title="Let us know what you are building."
       lede="Questions, a demo for your team, or a problem you want an agent workforce to take on. We read everything." />
     <section className="wrap"><div className="contact">
-      <form className="cform" onSubmit={(e) => { e.preventDefault(); alert("Prototype form. Nothing was sent."); }}>
+      {sent ? (
+        <div className="cform"><div className="csent">
+          <div className="csent-t">This is a demo, so nothing was sent.</div>
+          <div className="csent-d">There is no backend behind this form. To actually reach the team, open an issue on GitHub.</div>
+          <a className="btn primary" href="https://github.com/Osiyomeoh/conductor" target="_blank" rel="noreferrer">Open GitHub</a>
+        </div></div>
+      ) : (
+      <form className="cform" onSubmit={(e) => { e.preventDefault(); setSent(true); }}>
         <div className="cf"><label>Name</label><input placeholder="Your name" /></div>
         <div className="cf"><label>Work email</label><input type="email" placeholder="you@team.com" /></div>
         <div className="cf"><label>What can we help with?</label><textarea rows={4} placeholder="Tell us about your team and your agents." /></div>
         <button className="btn primary" type="submit">Send</button>
         <div className="cnote">Prototype form. It collects nothing and sends nothing.</div>
       </form>
+      )}
       <div className="cside">
         <h4>Other ways</h4>
         <a href="https://github.com/Osiyomeoh/conductor" target="_blank" rel="noreferrer">GitHub</a>
