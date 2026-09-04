@@ -61,6 +61,7 @@ class Mailer:
     password: str
     sender: str
     starttls: bool = True
+    ssl: bool = False               # implicit TLS (SMTP_SSL, e.g. port 465)
     smtp_factory: object = None      # (host, port) -> smtp client; injectable for tests
 
     def send(self, to: str, subject: str, body: str) -> EmailMessage:
@@ -69,10 +70,15 @@ class Mailer:
         msg["To"] = to
         msg["Subject"] = subject
         msg.set_content(body)
-        make = self.smtp_factory or (lambda h, p: __import__("smtplib").SMTP(h, p, timeout=20))
+        if self.smtp_factory is not None:
+            make = self.smtp_factory
+        elif self.ssl:
+            make = lambda h, p: __import__("smtplib").SMTP_SSL(h, p, timeout=20)  # noqa: E731
+        else:
+            make = lambda h, p: __import__("smtplib").SMTP(h, p, timeout=20)      # noqa: E731
         smtp = make(self.host, self.port)
         try:
-            if self.starttls:
+            if self.starttls and not self.ssl:      # 465 is already encrypted
                 smtp.starttls()
             if self.user:
                 smtp.login(self.user, self.password)
@@ -142,11 +148,14 @@ def mailer_from_env() -> Mailer | None:
     sender = os.environ.get("CONDUCTOR_SMTP_FROM") or os.environ.get("CONDUCTOR_SMTP_USER")
     if not host or not sender:
         return None
-    return Mailer(host=host, port=int(os.environ.get("CONDUCTOR_SMTP_PORT", "587")),
+    port = int(os.environ.get("CONDUCTOR_SMTP_PORT", "587"))
+    # Port 465 is implicit TLS (SMTP_SSL); 587 is STARTTLS. Overridable by env.
+    ssl = os.environ.get("CONDUCTOR_SMTP_SSL", "1" if port == 465 else "0") == "1"
+    return Mailer(host=host, port=port,
                   user=os.environ.get("CONDUCTOR_SMTP_USER", ""),
                   password=os.environ.get("CONDUCTOR_SMTP_PASSWORD", ""),
-                  sender=sender,
-                  starttls=os.environ.get("CONDUCTOR_SMTP_STARTTLS", "1") == "1")
+                  sender=sender, ssl=ssl,
+                  starttls=(not ssl) and os.environ.get("CONDUCTOR_SMTP_STARTTLS", "1") == "1")
 
 
 def reader_from_env() -> InboxReader | None:

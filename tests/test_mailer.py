@@ -50,6 +50,23 @@ def test_mailer_sends_over_injected_smtp():
     assert s.sent["Subject"] == "[Conductor dec_1] Q?"
 
 
+def test_mailer_ssl_skips_starttls():
+    FakeSMTP.instances.clear()
+    m = Mailer(host="h", port=465, user="u", password="p", sender="s",
+               ssl=True, starttls=True, smtp_factory=FakeSMTP)
+    m.send("a@b.co", "subj", "body")
+    assert "starttls" not in FakeSMTP.instances[0].did   # 465 is already encrypted
+
+
+def test_mailer_from_env_infers_ssl_on_465(monkeypatch):
+    from conductor.mailer import mailer_from_env
+    monkeypatch.setenv("CONDUCTOR_SMTP_HOST", "server372.web-hosting.com")
+    monkeypatch.setenv("CONDUCTOR_SMTP_FROM", "conductor@rolepilotai.com")
+    monkeypatch.setenv("CONDUCTOR_SMTP_PORT", "465")
+    m = mailer_from_env()
+    assert m.ssl is True and m.starttls is False and m.port == 465
+
+
 class FakeIMAP:
     def __init__(self, messages):
         self._messages = messages     # {num: raw_bytes}
