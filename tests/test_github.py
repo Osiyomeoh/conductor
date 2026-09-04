@@ -1,0 +1,124 @@
+"""GitHub client: verify request shaping and verdict mapping without a network.
+
+The transport is injected, so each method's verb, URL and body are asserted
+against canned responses. This is what lets the integration be built and trusted
+before a real GitHub App is registered.
+"""
+import json
+
+from conductor.github import GitHubClient, GitHubError
+
+
+class FakeGitHub:
+    """Records requests and replays queued responses. A response is
+    (status, dict-or-list); the body is JSON-encoded for the client to parse."""
+    def __init__(self):
+        self.calls = []
+        self._queue = []
+
+    def enqueue(self, status, payload):
+        self._queue.append((status, json.dumps(payload).encode()))
+        return self
+
+    def __call__(self, method, url, headers, body):
+        self.calls.append({"method": method, "url": url,
+                           "body": json.loads(body) if body else None,
+                           "auth": headers.get("Authorization")})
+        return self._queue.pop(0)
+
+
+def client(fake):
+    return GitHubClient(token="t0ken", repo="acme/app", opener=fake)
+
+
+def test_create_branch_posts_ref_and_sends_auth():
+    fake = FakeGitHub().enqueue(201, {"ref": "refs/heads/x"})
+    client(fake).create_branch("conductor/cm_1", "abc123")
+    call = fake.calls[0]
+    assert call["method"] == "POST"
+    assert call["url"].endswith("/repos/acme/app/git/refs")
+    assert call["body"] == {"ref": "refs/heads/conductor/cm_1", "sha": "abc123"}
+    assert call["auth"] == "Bearer t0ken"
+
+
+def test_create_branch_existing_falls_back_to_patch():
+    fake = FakeGitHub().enqueue(422, {"message": "Reference already exists"}) \
+                       .enqueue(200, {"ref": "refs/heads/x"})
+    client(fake).create_branch("conductor/cm_1", "def456")
+    assert fake.calls[0]["method"] == "POST"        # tried to create
+    assert fake.calls[1]["method"] == "PATCH"        # then updated the ref
+    assert fake.calls[1]["body"]["force"] is False    # never a force-move
+
+
+def test_open_draft_pr_reuses_existing_open_pr():
+    fake = FakeGitHub().enqueue(200, [{"number": 7, "draft": True}])
+    pr = client(fake).open_draft_pr("conductor/cm_1", "main", "t", "b")
+    assert pr["number"] == 7
+    assert len(fake.calls) == 1 and fake.calls[0]["method"] == "GET"   # no POST
+
+
+def test_open_draft_pr_creates_when_none_exists():
+    fake = FakeGitHub().enqueue(200, []).enqueue(201, {"number": 9, "draft": True})
+    pr = client(fake).open_draft_pr("conductor/cm_1", "main", "Fix webhook", "body")
+    assert pr["number"] == 9
+    post = fake.calls[1]
+    assert post["method"] == "POST" and post["url"].endswith("/repos/acme/app/pulls")
+    assert post["body"]["draft"] is True and post["body"]["base"] == "main"
+
+
+def test_set_check_maps_verdict_to_status_state():
+    fake = FakeGitHub().enqueue(201, {}).enqueue(201, {})
+    c = client(fake)
+    c.set_check("sha1", "cm_1", True, "assert passed")
+    c.set_check("sha1", "cm_1", False, "assert failed: not lowercased")
+    assert fake.calls[0]["body"]["state"] == "success"
+    assert fake.calls[1]["body"]["state"] == "failure"
+    assert fake.calls[1]["body"]["context"] == "conductor/cm_1"
+
+
+def test_mark_ready_clears_draft():
+    fake = FakeGitHub().enqueue(200, {"number": 9, "draft": False})
+    client(fake).mark_ready(9)
+    assert fake.calls[0]["method"] == "PATCH"
+    assert fake.calls[0]["body"] == {"draft": False}
+
+
+def test_http_error_raises_githuberror_with_status():
+    fake = FakeGitHub().enqueue(403, {"message": "Resource not accessible"})
+    try:
+        client(fake).default_branch()
+        assert False, "expected GitHubError"
+    except GitHubError as e:
+        assert e.status == 403 and "not accessible" in str(e)
+
+
+def test_executor_merge_opens_draft_pr_and_marks_ready(tmp_path, monkeypatch):
+    """On verified work the GitHub executor pushes the branch, opens a draft PR,
+    records the passing check, and takes it out of draft. It never merges."""
+    import subprocess
+    from conductor.github import GitHubExecutor
+
+    repo = str(tmp_path)
+    for args in (["init", "-q", "-b", "main"], ["config", "user.email", "t@t"],
+                 ["config", "user.name", "t"]):
+        subprocess.run(["git", "-C", repo, *args], check=True)
+    (tmp_path / "README.md").write_text("# base\n")
+    subprocess.run(["git", "-C", repo, "add", "-A"], check=True)
+    subprocess.run(["git", "-C", repo, "commit", "-q", "-m", "base"], check=True)
+    subprocess.run(["git", "-C", repo, "branch", "conductor/cm_1"], check=True)
+
+    fake = (FakeGitHub()
+            .enqueue(200, {"default_branch": "main"})     # default_branch()
+            .enqueue(200, [])                              # open_draft_pr: none open
+            .enqueue(201, {"number": 12, "draft": True})  # create draft PR
+            .enqueue(201, {})                             # set_check
+            .enqueue(200, {"number": 12, "draft": False}))  # mark_ready
+    ex = GitHubExecutor(repo=repo, client=client(fake))
+    monkeypatch.setattr(ex, "_push", lambda branch: None)   # no network in tests
+
+    ok, detail = ex.merge("conductor/cm_1")
+    assert ok and "PR #12" in detail
+    verbs = [(c["method"], c["url"].rsplit("/", 2)[-2] + "/" + c["url"].rsplit("/", 1)[-1]) for c in fake.calls]
+    assert any(c["method"] == "POST" and c["url"].endswith("/pulls") for c in fake.calls)   # opened PR
+    assert any(c["body"] == {"draft": False} for c in fake.calls if c["method"] == "PATCH")  # marked ready
+    assert any(c["body"].get("state") == "success" for c in fake.calls if c["method"] == "POST" and "statuses" in c["url"])
