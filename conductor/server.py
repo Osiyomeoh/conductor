@@ -55,9 +55,16 @@ def state(c) -> dict:
         ready = sum(1 for b in spec if not b.discarded
                     for cid in b.commitments
                     if g.get(cid).status is Status.DONE)
+        # The review minutes this decision is holding hostage: sum the review
+        # cost of every commitment it blocks. Attention is the budget, so the
+        # honest framing of a question's weight is the attention it frees.
+        review_minutes = sum(g.get(cid).review_cost_minutes for cid in d.blocked
+                             if g.get(cid) is not None)
         decisions.append({
             "id": d.id, "question": d.root_question, "options": d.options,
             "unblocks": d.unblock_value,
+            "commitments": len(d.blocked),
+            "review_minutes": review_minutes,
             "compressed_from": len(d.merged_from) + 1,
             "branches": len(spec), "prebuilt": ready,
             "spent": round(c.cost.for_decision(d.id), 4),

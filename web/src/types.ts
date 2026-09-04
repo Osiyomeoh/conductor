@@ -27,6 +27,8 @@ export interface DecisionSummary {
   question: string;
   options: string[];
   unblocks: number;
+  commitments: number;
+  review_minutes: number;
   compressed_from: number;
   branches: number;
   prebuilt: number;

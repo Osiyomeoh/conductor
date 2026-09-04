@@ -1,104 +1,133 @@
-# Conductor — 5-minute demo video script
+# Conductor, 5-minute demo video, script and shot list
 
-Target: 4:30. Slides + screen recording + voiceover, no face needed. The one
-non-negotiable beat is the caught lie, live, on real git. Lead with it.
+One theme, said in one sentence:
 
-Recording note: use the deterministic run so nothing depends on a model quota.
-`python real_demo.py` for the terminal proof; `python serve.py` →
-http://127.0.0.1:7616 for the UI. Drive the app with "Run six".
+> The best agent does not make the human manage more agents. It makes the human
+> manage less, while increasing the truth of what actually got done.
 
----
+Tone: calm, precise, slightly intense. No hype. Clarity and inevitability. One
+voice. Music low and minimal, tense then resolving. Prefer real screen
+recordings over slides. The caught lie is the emotional peak and must be real or
+tightly edited.
 
-## 0:00–0:35 — The problem, through one person (Impact)
+Recording note: the deterministic path runs cold with no keys, so nothing
+depends on a model quota. `python real_demo.py` for terminal proof; the live app
+at https://pe6euudszs.us-west-2.awsapprunner.com drives the UI beats.
 
-VISUAL: the landing hero, then cut to a plain slide with Maya's six tasks, three
-turning red.
+Structure (5:00):
 
-VO: "This is Maya. She's a staff engineer. This morning she handed six tasks to
-her coding agents. By lunch, all six came back marked done. Three of them were
-wrong. Not broken-obviously wrong — confidently, plausibly wrong. A slugify that
-forgot to lowercase. A migration that passed its own script but not the schema.
-Agents don't get tired. They get confidently lost, and they never tell you. So
-Maya spends her afternoon reading agent output to find out which 'done' is a
-lie. Every tool she has records all six as success."
-
-## 0:35–1:05 — The thesis (Originality)
-
-VISUAL: one line on screen: **"Done is a claim, not a fact."**
-
-VO: "Conductor is built on one idea. Done is a claim, not a fact. Add agents to
-a team and the bottleneck stops being doing the work. It becomes confirming the
-work is real. Conductor is the project manager for that."
-
-## 1:05–1:35 — One conversation to a team (the arc)
-
-VISUAL: the app. Click "Plan a sprint." Show the plan: each commitment with its
-`proof:` line. Point at the two the planner REFUSED ("no evidence requirement",
-"trivially passing command proves nothing").
-
-VO: "You describe a sprint once. Conductor turns it into commitments, and here's
-the first tell: every commitment carries the check that will prove it, written
-before any work starts. Work whose completion couldn't be proven isn't planned
-at all. Approve, and it runs."
-
-## 1:35–2:35 — THE CATCH, live on real git (Technical + Presentation)
-
-VISUAL: run `python real_demo.py` in the terminal, or "Run six" in the UI. Slow
-down here. Show the board: an agent reports done on slugify → REJECTED, evidence
-detail "assert failed, not lowercased" → re-dispatched → verified → merged. Then
-show the real git log and `slugify('Hello World') == 'hello-world'` on the base.
-
-VO: "Watch the slugify task. The agent writes code and reports complete. But
-Conductor doesn't take its word for it — it runs the check, in a real git
-worktree. The check fails. Conductor catches the lie before any human sees it,
-re-dispatches with the failure as context, and the retry passes. Only verified
-work merges to the base branch. Maya never reviewed the wrong version. It never
-existed on her repo."
-
-## 2:35–3:15 — Waiting is optional (Creativity)
-
-VISUAL: open the decision that needs a human. Show the three speculative
-branches, one already merged, the cost ("$0.03").
-
-VO: "Some things only a human can decide. Most tools stop and wait. Conductor
-doesn't. While the decision is open, it builds every plausible answer overnight,
-in isolated branches. Maya answers in twenty seconds — and the branch she chose
-is already built and verified. The others cost three cents and are thrown away."
-
-## 3:15–3:45 — Attention + the team (Design, completeness)
-
-VISUAL: the Cost & trust view (held work with reasons, per-worker trust), then
-the Team view (humans and agents, a delegate, probation).
-
-VO: "Conductor only dispatches what Maya can actually review today; the rest is
-held, with the reason. Agents aren't configured, they're hired: they join the
-roster beside people, on probation, and earn a lighter check as they prove out."
-
-## 3:45–4:15 — Built with Strands (Technical, make it impossible to miss)
-
-VISUAL: a slide of the architecture: Strands agents (Planner, Recovery,
-Compressor, Orchestrator) on Bedrock → the loop → real git. One line highlighted:
-"No agent can mark anything done."
-
-VO: "Conductor is a Strands Agents multi-agent system on Amazon Bedrock. Agents
-do the judgment — planning, diagnosis. Deterministic code does the consequence —
-verification, policy, trust. And the rule that makes it safe: no agent can mark
-its own work done. The only path to done is a real check."
-
-## 4:15–4:30 — Close (Presentation)
-
-VISUAL: back to the empty decision surface: "Nothing needs you."
-
-VO: "The best day is the one where Conductor stays quiet — the agents worked, the
-checks passed, and nothing needed Maya. Conductor. The project manager for
-humans and agents. It's open source, it runs cold with no keys, and the link's
-below."
+| time | section | length |
+|---|---|---|
+| 0:00 to 0:25 | the problem | 25s |
+| 0:25 to 3:20 | the live flow | 2m55 |
+| 3:20 to 4:15 | architecture, why it is different | 55s |
+| 4:15 to 4:45 | live demo and AgentCore | 30s |
+| 4:45 to 5:00 | close | 15s |
 
 ---
 
-## Checklist the judges score against
-- [ ] Problem stated in the first 30s, through a specific person (Maya)
-- [ ] Working project demonstrated end to end (the catch, on real git)
-- [ ] Strands named on screen and in VO
-- [ ] Who it's for + why it matters, said out loud
-- [ ] Under 5:00, public on YouTube/Vimeo
+## 0:00 to 0:25, the problem
+
+VISUAL: dark title card, Conductor, subtitle "a project manager for teams of
+humans and agents." Quick cuts of 2026 pain: Slack threads full of "done", an
+agent PR that looks right and is wrong, a tired founder at a board at 11pm.
+
+VO: "We added agents. Output exploded. So did a new kind of failure: agents that
+report done, with total confidence, while being wrong. The bottleneck stopped
+being labour. It became confirming the work is real, and protecting the one
+resource that still cannot scale: human attention."
+
+ON SCREEN: "Done is a claim. Human attention is the budget."
+
+## 0:25 to 0:50, intent becomes a plan
+
+VISUAL: Alex drops a messy voice note. "Onboarding redesign by Friday, Sarah owns
+design. Payment webhook is broken. Need competitive research on three tools.
+Landing page copy. Agents can take the research and the tests." Conductor turns
+it into a clean plan: human commitments and agent commitments separated, each
+carrying its proof requirement, editable. Alex makes two edits and approves.
+
+VO: "You speak. Conductor turns intent into a living system of commitments, each
+one with the check that will prove it. You keep the judgment. Everything else
+becomes infrastructure."
+
+## 0:50 to 1:40, the agent lies, and is caught (the climax)
+
+VISUAL: an agent finishes early and reports done. The output looks good. The
+verification runner runs the declared check, in a real git worktree. It fails.
+The claim is rejected. The worktree is destroyed. The agent's trust on this kind
+of work drops. Recovery re-dispatches, and the retry passes and merges. Cut to
+the real git log and the correct file on the base branch.
+
+ON SCREEN: "No path from any language model to done. Only the verification runner
+completes work."
+
+VO: "This is the moment most tools miss. An agent can be confidently wrong.
+Conductor never lets a claim become reality until the evidence passes. The wrong
+work is discarded before any human sees it."
+
+## 1:40 to 2:20, the silent human, protected attention
+
+VISUAL: a human teammate goes quiet, a second agent is slow. Conductor runs
+graduated recovery, soft then firmer, without escalating. The decision surface
+stays empty. Then one clean item appears, ranked by what it unblocks: "unblocks 4
+commitments, frees 40m of your review." Alex answers once.
+
+VO: "Most problems are solved without you. When something needs your judgment, it
+arrives clean, ranked, with options. Everything else was already handled."
+
+## 2:20 to 2:55, speculation, the night it worked while you slept
+
+VISUAL: one open decision was blocking progress. Conductor had already forked the
+plan across the plausible answers, built the branches in isolation, verified
+them, and discarded the losers. Cost shown, a few cents. Attention spent, zero
+until the moment of choice.
+
+VO: "Waiting is optional. Conductor spends cheap parallel compute so that when you
+decide, the work is already real."
+
+## 2:55 to 3:20, the human is lighter
+
+VISUAL: the board is accurate with nobody updating status, the trust ledger is
+current, cost per verified commitment is visible, the event log is complete, the
+decision surface reads "Nothing else needs you."
+
+VO: "The board updated itself. Reality was verified. Attention was protected. The
+human spent judgment only where it mattered."
+
+## 3:20 to 4:15, architecture, why it is different
+
+VISUAL: a clean diagram with one highlighted edge: there is no path from any
+language model to done. Callouts: commitment graph, verification runner
+(deterministic), attention ledger, speculation engine, policy gate, trust ledger,
+event-sourced control loop.
+
+VO: "Language models do judgment. Deterministic code does consequence. That single
+separation is what makes the system trustworthy. No agent can mark its own work
+done."
+
+## 4:15 to 4:45, live demo and AgentCore
+
+VISUAL: the live app URL, the Real execution view running one real tick against a
+real git repo, then the AgentCore runtime ARN and one invocation returning real
+state. "This is not a mock. This runs."
+
+VO: "Built with the Strands Agents SDK. Deployed on Amazon Bedrock AgentCore
+Runtime. Live demo available to judges."
+
+## 4:45 to 5:00, close
+
+VISUAL: black screen. "Conductor. Spends cheap labour to buy back expensive
+attention." Smaller: "Agents for Humans."
+
+VO: "The best agent does not make the human manage more. It makes the human manage
+less, while increasing the truth of what actually got done."
+
+---
+
+## The checklist judges score against
+- [ ] Problem stated in the first 30s, through a specific person (Alex)
+- [ ] Working project shown end to end (the catch, on real git)
+- [ ] Strands named on screen and in VO; AgentCore deployment shown
+- [ ] Who it is for and why it matters, said out loud
+- [ ] Under 5:00, public link on screen

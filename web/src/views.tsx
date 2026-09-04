@@ -19,7 +19,8 @@ function DecisionCard({ d, onOpen, onAnswer }: {
     <div className="card decision" onClick={() => onOpen(d.id)}>
       <div className="q">{d.question}</div>
       <div className="meta">
-        unblocks <b>{d.unblocks}</b> items
+        unblocks <b>{d.commitments || d.unblocks}</b> commitment{(d.commitments || d.unblocks) === 1 ? "" : "s"}
+        {d.review_minutes > 0 && <> · frees <b>{d.review_minutes >= 60 ? `~${(d.review_minutes / 60).toFixed(1)}h` : `${d.review_minutes}m`}</b> of your review</>}
         {d.compressed_from > 1 && <> · compressed from <b>{d.compressed_from}</b> escalations</>}
         {d.branches > 0 && <> · <b>{d.prebuilt}</b> of {d.branches} branches already built · ${d.spent.toFixed(4)} spent</>}
       </div>
