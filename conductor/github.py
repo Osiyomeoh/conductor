@@ -162,7 +162,8 @@ class GitHubExecutor(GitExecutor):
         num = pr.get("number")
         url = pr.get("html_url") or f"https://github.com/{self.client.repo}/pull/{num or ''}"
         if num and not any(p.get("number") == num for p in self.prs):
-            self.prs.append({"number": num, "url": url, "title": pr.get("title", branch)})
+            self.prs.append({"number": num, "url": url, "title": pr.get("title", branch),
+                             "branch": branch, "state": "open"})
         return True, f"opened draft PR #{num or '?'} {url}"
 
 

@@ -397,6 +397,30 @@ async def api_github_run(request: Request, p: Principal = Depends(caller)):
     return await run_in_threadpool(work)
 
 
+@app.post("/api/github/webhook")
+async def api_github_webhook(request: Request):
+    """Receive GitHub events. There is deliberately no session dependency here:
+    GitHub cannot send the demo cookie, so the HMAC signature IS the auth. An
+    unsigned or mis-signed request is dropped."""
+    import os as _os
+    from .webhook import handle_event, verify_signature
+    secret = _os.environ.get("CONDUCTOR_GITHUB_WEBHOOK_SECRET")
+    if not secret:
+        raise HTTPException(status_code=503, detail="webhooks not configured")
+    body = await request.body()
+    sig = request.headers.get("x-hub-signature-256")
+    if not verify_signature(secret, body, sig):
+        raise HTTPException(status_code=401, detail="invalid signature")
+    import json as _json_mod
+    try:
+        payload = _json_mod.loads(body or b"{}")
+    except Exception:
+        raise HTTPException(status_code=400, detail="invalid JSON")
+    event = request.headers.get("x-github-event", "")
+    with _gh_lock:
+        return handle_event(event, payload, _gh["c"])
+
+
 @app.post("/api/reset")
 def api_reset(p: Principal = Depends(caller)):
     """Rebuild this tenant from a fresh seed. The guided demo calls this so a
