@@ -154,6 +154,54 @@ def health():
             "active_boards": registry.count()}
 
 
+@app.get("/api/metrics")
+def api_metrics():
+    """Operational metrics in Prometheus text format, for a CloudWatch/Grafana
+    scrape and for alarms (catch rate, held work, spend). Aggregated across the
+    active boards; no auth, no tenant data, just counters and gauges."""
+    from .models import Status
+    agg = {"dispatched": 0, "verified": 0, "claims_rejected": 0, "held": 0,
+           "escalations_raised": 0, "questions_asked": 0}
+    spend = 0.0
+    in_flight = 0
+    for tenant in registry.tenants():
+        try:
+            s = registry.read(tenant, state)
+        except Exception:  # noqa: BLE001
+            continue
+        for k in agg:
+            agg[k] += s["metrics"].get(k, 0)
+        spend += s["cost"].get("total", 0.0)
+        in_flight += s.get("in_flight", 0)
+    caught = agg["claims_rejected"]
+    claims = agg["verified"] + caught
+    catch_rate = (caught / claims) if claims else 0.0
+    lines = [
+        "# HELP conductor_active_boards Boards live in memory",
+        "# TYPE conductor_active_boards gauge",
+        f"conductor_active_boards {registry.count()}",
+        "# TYPE conductor_dispatched_total counter",
+        f"conductor_dispatched_total {agg['dispatched']}",
+        "# TYPE conductor_verified_total counter",
+        f"conductor_verified_total {agg['verified']}",
+        "# TYPE conductor_claims_caught_total counter",
+        f"conductor_claims_caught_total {caught}",
+        "# HELP conductor_catch_rate Share of claims that failed verification",
+        "# TYPE conductor_catch_rate gauge",
+        f"conductor_catch_rate {catch_rate:.4f}",
+        "# TYPE conductor_held gauge",
+        f"conductor_held {agg['held']}",
+        "# TYPE conductor_in_flight gauge",
+        f"conductor_in_flight {in_flight}",
+        "# TYPE conductor_decisions_open gauge",
+        f"conductor_decisions_open {agg['questions_asked']}",
+        "# HELP conductor_spend_usd Total model spend across boards",
+        "# TYPE conductor_spend_usd gauge",
+        f"conductor_spend_usd {spend:.4f}",
+    ]
+    return Response("\n".join(lines) + "\n", media_type="text/plain; version=0.0.4")
+
+
 @app.get("/api/whoami")
 def api_whoami(p: Principal = Depends(caller)):
     """Who the caller is, for the SPA to render the signed-in user and gate UI

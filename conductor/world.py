@@ -108,7 +108,8 @@ def build(seed: int = 7, store=None, tenant: str = "default",
         executor = GitExecutor(init_repo(repo))
     return Conductor(graph=g, verifier=verifier, dispatcher=disp, surface=surface,
                      speculation=spec, trust=trust, cost=cost,
-                     recorder=recorder, executor=executor)
+                     recorder=recorder, executor=executor,
+                     cost_ceiling=float(os.environ.get("CONDUCTOR_COST_CEILING", "0")))
 
 
 def hire_agent(c, kind: str, competence: float = 0.8) -> str:

@@ -53,6 +53,7 @@ class Conductor:
     metrics: Metrics = field(default_factory=Metrics)
     silence_hours: float = 4.0
     executor: object = None  # GitExecutor for real mode; None = scratch-dir demo
+    cost_ceiling: float = 0.0  # hard spend cap; 0 = unlimited. Over it, work holds.
 
     def emit(self, msg: str) -> None:
         self.events.append(f"{now().isoformat(timespec='seconds')}  {msg}")
@@ -227,7 +228,18 @@ class Conductor:
                 self._escalate(cm, cm.title, cm.options, key=f"judgment:{cm.id}")
 
     def _dispatch(self) -> None:
+        # Cost governance: at or over the ceiling, stop spending. Ready work is
+        # held with the reason rather than dispatched, so a runaway can only ever
+        # cost up to the ceiling, and the held work resumes if the ceiling lifts.
+        over_budget = self.cost_ceiling > 0 and self.cost.total >= self.cost_ceiling
         for cm in self.graph.ready():
+            if over_budget:
+                cm.status = Status.HELD
+                self.metrics.held += 1
+                cm.log(f"held: spend ceiling ${self.cost_ceiling:.2f} reached")
+                self.record(EventKind.HELD, commitment_id=cm.id,
+                            reason=f"spend ceiling ${self.cost_ceiling:.2f} reached")
+                continue
             if self.dispatcher.dispatch(cm):
                 self.metrics.dispatched += 1
                 self.record(EventKind.DISPATCHED, commitment_id=cm.id,
