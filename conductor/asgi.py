@@ -501,6 +501,70 @@ async def api_github_webhook(request: Request):
         return handle_event(event, payload, _gh["c"])
 
 
+# --- Slack delivery --------------------------------------------------------
+def _slack_client():
+    import os as _os
+    from .slack import SlackClient
+    tok = _os.environ.get("CONDUCTOR_SLACK_BOT_TOKEN")
+    return SlackClient(token=tok) if tok else None
+
+
+@app.post("/api/slack/interactive")
+async def api_slack_interactive(request: Request):
+    """Receive a Slack button click and answer the decision. Session-less: Slack
+    cannot send the cookie, so the Slack signature is the auth. A Slack workspace
+    maps to one Conductor tenant (CONDUCTOR_SLACK_TENANT)."""
+    import json as _json
+    import os as _os
+    import urllib.parse as _up
+    from .slack import parse_action, verify_signature
+    secret = _os.environ.get("CONDUCTOR_SLACK_SIGNING_SECRET")
+    if not secret:
+        raise HTTPException(status_code=503, detail="slack not configured")
+    body = await request.body()
+    ts = request.headers.get("x-slack-request-timestamp", "")
+    sig = request.headers.get("x-slack-signature")
+    if not verify_signature(secret, ts, body, sig):
+        raise HTTPException(status_code=401, detail="invalid slack signature")
+    form = _up.parse_qs(body.decode(errors="replace"))
+    try:
+        payload = _json.loads(form.get("payload", ["{}"])[0])
+    except Exception:
+        raise HTTPException(status_code=400, detail="invalid payload")
+    action = parse_action(payload)
+    if action is None:
+        return {"text": "No answerable action."}
+    did, choice = action
+    tenant = _os.environ.get("CONDUCTOR_SLACK_TENANT", "default")
+
+    def do(c):
+        c.answer(did, choice)
+        c.run(ticks=4)
+        return True
+    try:
+        await run_in_threadpool(lambda: registry.write(tenant, do))
+    except KeyError:
+        return {"text": f"Decision {did} is no longer open."}
+    return {"text": f"Answered: {choice}. The winning branch is already verified."}
+
+
+@app.post("/api/slack/deliver")
+async def api_slack_deliver(p: Principal = Depends(require("admin"))):
+    """Post this tenant's open decisions to the configured Slack channel."""
+    import os as _os
+    client = _slack_client()
+    channel = _os.environ.get("CONDUCTOR_SLACK_CHANNEL")
+    if client is None or not channel:
+        raise HTTPException(status_code=503,
+                            detail="set CONDUCTOR_SLACK_BOT_TOKEN and CONDUCTOR_SLACK_CHANNEL")
+    s = registry.read(p.tenant, state)
+    posted = 0
+    for d in s.get("decisions", []):
+        await run_in_threadpool(lambda d=d: client.post_decision(channel, d))
+        posted += 1
+    return {"delivered": posted}
+
+
 @app.post("/api/reset")
 def api_reset(p: Principal = Depends(require("admin"))):
     """Rebuild this tenant from a fresh seed. The guided demo calls this so a
