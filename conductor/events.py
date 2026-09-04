@@ -72,11 +72,14 @@ class EventStore(Protocol):
     def append(self, event: Event) -> None: ...
     def read(self, tenant: str = "default", since: int = 0) -> Iterator[Event]: ...
     def last_seq(self, tenant: str = "default") -> int: ...
+    def next_seq(self, tenant: str = "default") -> int: ...
 
 
 class MemoryStore:
     def __init__(self) -> None:
         self._events: list[Event] = []
+        self._counters: dict[str, int] = {}
+        self._lock = threading.Lock()
 
     def append(self, event: Event) -> None:
         self._events.append(event)
@@ -87,6 +90,12 @@ class MemoryStore:
     def last_seq(self, tenant: str = "default") -> int:
         seqs = [e.seq for e in self._events if e.tenant == tenant]
         return max(seqs, default=0)
+
+    def next_seq(self, tenant: str = "default") -> int:
+        with self._lock:
+            n = self._counters.get(tenant, self.last_seq(tenant)) + 1
+            self._counters[tenant] = n
+            return n
 
 
 class JsonlStore:
@@ -118,6 +127,10 @@ class JsonlStore:
 
     def last_seq(self, tenant: str = "default") -> int:
         return max((e.seq for e in self.read(tenant)), default=0)
+
+    def next_seq(self, tenant: str = "default") -> int:
+        with self._lock:                       # jsonl is a single-process store
+            return self.last_seq(tenant) + 1
 
 
 class DynamoStore:
@@ -157,10 +170,23 @@ class DynamoStore:
 
     def last_seq(self, tenant: str = "default") -> int:
         from boto3.dynamodb.conditions import Key
-        r = self.table.query(KeyConditionExpression=Key("tenant").eq(tenant),
+        # seq > 0 skips the counter row (seq 0), which is not an event.
+        r = self.table.query(KeyConditionExpression=Key("tenant").eq(tenant) & Key("seq").gt(0),
                              ScanIndexForward=False, Limit=1)
         items = r.get("Items", [])
         return int(items[0]["seq"]) if items else 0
+
+    def next_seq(self, tenant: str = "default") -> int:
+        """Atomic across instances: a single UpdateItem ADD on the per-tenant
+        counter row (seq 0) hands out a unique, monotonic sequence number, so two
+        instances writing the same tenant never collide. This is what makes the
+        service safe to run on more than one instance."""
+        r = self.table.update_item(
+            Key={"tenant": tenant, "seq": 0},
+            UpdateExpression="ADD nextseq :one",
+            ExpressionAttributeValues={":one": 1},
+            ReturnValues="UPDATED_NEW")
+        return int(r["Attributes"]["nextseq"])
 
 
 class Recorder:
@@ -170,8 +196,6 @@ class Recorder:
     def __init__(self, store: EventStore | None = None, tenant: str = "default"):
         self.store = store or MemoryStore()
         self.tenant = tenant
-        self._seq = self.store.last_seq(tenant)
-        self._lock = threading.Lock()
         self.replaying = False
 
     def record(self, kind: EventKind, commitment_id: str | None = None,
@@ -181,11 +205,13 @@ class Recorder:
         # duplicate history rather than rebuild it.
         if self.replaying:
             return None
-        with self._lock:
-            self._seq += 1
-            e = Event(seq=self._seq, kind=kind, at=_now(), tenant=self.tenant,
-                      commitment_id=commitment_id, actor=actor,
-                      decision_id=decision_id, data=data)
+        # The store hands out the sequence number: atomic across instances for
+        # DynamoDB, locked within the process for the local stores. No
+        # per-process counter, so more than one instance is safe.
+        seq = self.store.next_seq(self.tenant)
+        e = Event(seq=seq, kind=kind, at=_now(), tenant=self.tenant,
+                  commitment_id=commitment_id, actor=actor,
+                  decision_id=decision_id, data=data)
         self.store.append(e)
         return e
 
