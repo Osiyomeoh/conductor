@@ -773,6 +773,33 @@ async def api_approve(request: Request, p: Principal = Depends(caller)):
     return await run_in_threadpool(work)
 
 
+@app.post("/api/goal")
+async def api_goal(request: Request, p: Principal = Depends(require("admin"))):
+    """Set a goal (intent + a metric that proves it + bounding values). Conductor
+    derives the work that would move the metric and attaches the metric itself as
+    an outcome commitment, so the sprint is done only when reality moves."""
+    from .goals import Goal, derive
+    from .planning import live_available
+    body = await _json(request)
+    intent = (body.get("intent") or "").strip()[:2000]
+    if not intent:
+        raise HTTPException(status_code=400, detail="intent required")
+    goal = Goal(intent=intent, outcome=(body.get("outcome") or "").strip(),
+                values=[str(v) for v in (body.get("values") or [])][:12])
+    live = live_available()
+
+    def do(c):
+        made, _rejected, source = derive(
+            goal, live=live, metric_source=getattr(c.verifier, "metric_source", None))
+        for cm in made:
+            c.graph.add(cm)
+        c.run(ticks=4)
+        s = state(c)
+        s["derived"], s["planned_by"] = len(made), source
+        return s
+    return await run_in_threadpool(lambda: registry.write(p.tenant, do))
+
+
 @app.post("/api/answer")
 async def api_answer(request: Request, p: Principal = Depends(caller)):
     body = await _json(request)
