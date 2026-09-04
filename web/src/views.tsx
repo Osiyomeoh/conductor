@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { api } from "./api";
 import type { State, DecisionSummary, DecisionDetail, Team, Plan, Activity } from "./types";
-import { useCount, useDictation } from "./hooks";
+import { useCount, useDictation, speak } from "./hooks";
 
 const esc = (s: unknown) => String(s ?? "");
 
@@ -668,12 +668,28 @@ export function PlanOverlay({ onClose, onApproved }: { onClose: () => void; onAp
   const [interim, setInterim] = useState("");
   const [p, setP] = useState<Plan | null>(null);
   const [busy, setBusy] = useState(false);
+  const [voice, setVoice] = useState(false);   // agent speaks back once you've spoken to it
   const dictation = useDictation(
     (phrase) => setIntent((prev) => (prev.trim() ? prev.trim() + " " : "") + phrase),
     (text) => setInterim(text));
-  const mic = () => { if (dictation.listening) { dictation.stop(); setInterim(""); } else dictation.start(); };
+  const mic = () => {
+    if (dictation.listening) { dictation.stop(); setInterim(""); }
+    else { setVoice(true); dictation.start(); }
+  };
 
-  const generate = async () => { setBusy(true); try { setP(await api.plan(intent)); } finally { setBusy(false); } };
+  const generate = async () => {
+    setBusy(true);
+    try {
+      const plan = await api.plan(intent);
+      setP(plan);
+      if (voice) {
+        const n = plan.commitments.length, r = plan.rejected.length;
+        speak(`I turned that into ${n} commitment${n === 1 ? "" : "s"}, each carrying the check that will prove it.`
+          + (r ? ` I refused ${r} that couldn't be proven.` : "")
+          + " Approve to start the team.");
+      }
+    } finally { setBusy(false); }
+  };
   const approve = async () => { setBusy(true); try { await api.approve(intent); onApproved(); onClose(); } finally { setBusy(false); } };
 
   const assignee = (c: Plan["commitments"][number]) =>

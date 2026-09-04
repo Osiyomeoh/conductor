@@ -81,6 +81,21 @@ export function useDictation(onPhrase: (text: string) => void, onInterim?: (text
   return { supported, listening, start, stop };
 }
 
+// Speak text aloud via the browser's speech synthesis. No key, no network. A
+// no-op where unsupported, and cancels any in-progress utterance first so the
+// agent never talks over itself.
+export function speak(text: string): void {
+  try {
+    const synth = window.speechSynthesis;
+    if (!synth || !text) return;
+    synth.cancel();
+    const u = new SpeechSynthesisUtterance(text);
+    u.rate = 1.03;
+    u.pitch = 1.0;
+    synth.speak(u);
+  } catch { /* unsupported: silent */ }
+}
+
 // Count-up on a changing number, so the hero figures animate like the vanilla app.
 export function useCount(to: number): number {
   const [v, setV] = useState(to);
